@@ -67,11 +67,27 @@ function analyzePrompt(prompt) {
     dark: has("暗黑", "黑暗", "dark", "shadow", "night"),
     knight: has("骑士", "knight", "武士", "warrior", "剑士"),
     chest: has("宝箱", "箱子", "chest", "treasure"),
+    mage: has("法师", "巫师", "mage", "wizard"),
+    archer: has("弓", "弓箭", "archer", "bow"),
+    shield: has("盾", "shield"),
+    staff: has("法杖", "权杖", "staff", "wand"),
+    cat: has("猫", "cat"),
+    owl: has("猫头鹰", "owl"),
+    octopus: has("章鱼", "octopus"),
+    mech: has("机械", "机甲", "robot", "mech", "machine"),
+    plant: has("植物", "花", "树", "plant", "flower"),
+    merchant: has("商人", "merchant", "shop"),
+    slime: has("史莱姆", "slime"),
     purple: has("紫", "purple", "violet"),
+    blue: has("蓝", "blue"),
+    red: has("红", "red"),
+    gold: has("金", "gold", "黄金"),
     fire: has("火", "flame", "fire", "焰"),
     ice: has("冰", "ice", "frost"),
+    thunder: has("雷", "电", "lightning", "thunder"),
     forest: has("森林", "forest", "green", "自然"),
     cyber: has("赛博", "cyber", "neon", "科幻"),
+    steampunk: has("蒸汽朋克", "steampunk"),
   };
 }
 
@@ -90,6 +106,18 @@ function derivePalette(basePalette, semantic) {
   }
   if (semantic.ice) {
     return ["#08131d", "#1d4ed8", "#60a5fa", "#bae6fd", "#f8fbff"];
+  }
+  if (semantic.thunder) {
+    return ["#101019", "#2563eb", "#7dd3fc", "#facc15", "#fefce8"];
+  }
+  if (semantic.steampunk || semantic.gold) {
+    return ["#17110c", "#7c4a1e", "#c08430", "#eab308", "#fff7d6"];
+  }
+  if (semantic.red) {
+    return ["#1c0b0b", "#991b1b", "#ef4444", "#fb923c", "#fff1f2"];
+  }
+  if (semantic.blue) {
+    return ["#08111f", "#1d4ed8", "#38bdf8", "#bfdbfe", "#f8fbff"];
   }
   if (semantic.forest) {
     return ["#0b1610", "#15803d", "#65a30d", "#bef264", "#f7fee7"];
@@ -133,31 +161,111 @@ function drawCharacter(ctx, frame, opt) {
     return;
   }
 
-  const { unit, cells, rand, palette } = opt;
+  const { unit, cells, rand, palette, semantic } = opt;
   const bob = Math.sin(frame * 1.5) * 0.8;
   const body = palette[1];
   const trim = palette[2];
   const accent = palette[3];
   const light = palette[4];
   const shadow = palette[0];
-  const pixels = [
-    [14, 7 + bob, 4, 2, light],
-    [12, 9 + bob, 8, 6, body],
-    [13, 11 + bob, 2, 2, light],
-    [17, 11 + bob, 2, 2, shadow],
-    [11, 15 + bob, 10, 10, body],
-    [10, 17 + bob, 3, 6, trim],
-    [19, 17 + bob, 3, 6, trim],
-    [13, 25 + bob, 3, 5, shadow],
-  ];
-  mirrorPixels(ctx, pixels, unit, cells);
-  rect(ctx, 14 + Math.sin(frame) * 2, 17 + bob, 4, 2, accent, unit);
-  rect(ctx, 18 + Math.cos(frame) * 2, 28 - bob, 5, 2, accent, unit);
+
+  if (semantic.slime) {
+    rect(ctx, 8, 16 + bob, 16, 11, body, unit);
+    rect(ctx, 10, 13 + bob, 12, 5, body, unit);
+    rect(ctx, 12, 18 + bob, 3, 2, light, unit);
+    rect(ctx, 18, 18 + bob, 3, 2, shadow, unit);
+    rect(ctx, 7, 25 + bob, 18, 3, accent, unit);
+  } else {
+    const pixels = [
+      [14, 7 + bob, 4, 2, light],
+      [12, 9 + bob, 8, 6, body],
+      [13, 11 + bob, 2, 2, light],
+      [17, 11 + bob, 2, 2, shadow],
+      [11, 15 + bob, 10, 10, body],
+      [10, 17 + bob, 3, 6, trim],
+      [19, 17 + bob, 3, 6, trim],
+      [13, 25 + bob, 3, 5, shadow],
+    ];
+    mirrorPixels(ctx, pixels, unit, cells);
+    rect(ctx, 14 + Math.sin(frame) * 2, 17 + bob, 4, 2, accent, unit);
+    rect(ctx, 18 + Math.cos(frame) * 2, 28 - bob, 5, 2, accent, unit);
+  }
+
+  if (semantic.owl) {
+    rect(ctx, 10, 6 + bob, 4, 4, trim, unit);
+    rect(ctx, 18, 6 + bob, 4, 4, trim, unit);
+    rect(ctx, 12, 10 + bob, 3, 3, light, unit);
+    rect(ctx, 17, 10 + bob, 3, 3, light, unit);
+    rect(ctx, 15, 13 + bob, 2, 2, accent, unit);
+  }
+
+  if (semantic.cat) {
+    rect(ctx, 11, 6 + bob, 3, 4, trim, unit);
+    rect(ctx, 18, 6 + bob, 3, 4, trim, unit);
+    rect(ctx, 8, 23 + bob, 2, 6, accent, unit);
+  }
+
+  if (semantic.octopus) {
+    for (let i = 0; i < 5; i += 1) {
+      rect(ctx, 8 + i * 4, 24 + Math.sin(frame + i) * 2, 2, 6, i % 2 ? trim : body, unit);
+    }
+  }
+
+  if (semantic.mech) {
+    rect(ctx, 9, 14 + bob, 14, 2, light, unit);
+    rect(ctx, 8, 18 + bob, 2, 7, trim, unit);
+    rect(ctx, 22, 18 + bob, 2, 7, trim, unit);
+    rect(ctx, 15, 8 + bob, 2, 2, accent, unit);
+  }
+
+  if (semantic.mage || semantic.staff) {
+    rect(ctx, 7, 6 + bob, 18, 3, accent, unit);
+    rect(ctx, 11, 3 + bob, 10, 5, trim, unit);
+    rect(ctx, 25, 8 + bob, 2, 21, trim, unit);
+    rect(ctx, 23, 6 + bob, 6, 4, light, unit);
+  }
+
+  if (semantic.archer) {
+    rect(ctx, 24, 10 + bob, 2, 17, trim, unit);
+    rect(ctx, 23, 10 + bob, 1, 4, light, unit);
+    rect(ctx, 23, 23 + bob, 1, 4, light, unit);
+    rect(ctx, 14, 18 + bob, 11, 1, accent, unit);
+  }
+
+  if (semantic.shield) {
+    rect(ctx, 5, 16 + bob, 5, 9, trim, unit);
+    rect(ctx, 6, 18 + bob, 3, 5, light, unit);
+  }
+
+  if (semantic.merchant) {
+    rect(ctx, 5, 20 + bob, 5, 5, accent, unit);
+    rect(ctx, 22, 20 + bob, 5, 5, accent, unit);
+  }
+
+  drawElementAura(ctx, frame, opt, 6, 5, 24, 24);
   for (let i = 0; i < 6 + opt.detail; i += 1) {
     const x = 6 + rand() * 20;
     const y = 6 + rand() * 24;
     rect(ctx, x, y, 1, 1, rand() > 0.5 ? trim : light, unit);
   }
+}
+
+function drawElementAura(ctx, frame, opt, x, y, w, h) {
+  const { unit, rand, palette, semantic } = opt;
+  let color = null;
+  if (semantic.fire) color = "#fb923c";
+  if (semantic.ice) color = "#bae6fd";
+  if (semantic.thunder) color = "#facc15";
+  if (semantic.dark) color = "#a855f7";
+  if (!color) return;
+
+  ctx.globalAlpha = 0.42;
+  for (let i = 0; i < 10 + opt.detail; i += 1) {
+    const px = x + rand() * w + Math.sin(frame + i) * 1.2;
+    const py = y + rand() * h + Math.cos(frame + i) * 1.2;
+    rect(ctx, px, py, 1 + rand() * 1.8, 1 + rand() * 1.8, rand() > 0.5 ? color : palette[3], unit);
+  }
+  ctx.globalAlpha = 1;
 }
 
 function drawDarkKnight(ctx, frame, opt) {
@@ -220,6 +328,20 @@ function drawItem(ctx, frame, opt) {
   rect(ctx, 9, 18 - pulse, 14, 5, palette[0], unit);
   rect(ctx, 13, 13 - pulse, 6, 5, palette[3], unit);
   rect(ctx, 15, 14 - pulse, 2, 2, palette[4], unit);
+  if (opt.semantic.staff) {
+    rect(ctx, 15, 5 - pulse, 2, 22, palette[2], unit);
+    rect(ctx, 12, 4 - pulse, 8, 5, palette[4], unit);
+  }
+  if (opt.semantic.shield) {
+    rect(ctx, 9, 8 - pulse, 14, 16, palette[2], unit);
+    rect(ctx, 12, 11 - pulse, 8, 10, palette[4], unit);
+  }
+  if (opt.semantic.mech) {
+    rect(ctx, 7, 8 - pulse, 18, 16, palette[1], unit);
+    rect(ctx, 10, 11 - pulse, 5, 4, palette[4], unit);
+    rect(ctx, 18, 11 - pulse, 4, 4, palette[3], unit);
+  }
+  drawElementAura(ctx, frame, opt, 5, 5, 22, 22);
   for (let i = 0; i < 10 + detail; i += 1) {
     rect(ctx, 4 + rand() * 24, 5 + rand() * 24, 1, 1, palette[2 + (i % 3)], unit);
   }
@@ -273,7 +395,7 @@ function drawTile(ctx, frame, opt) {
 }
 
 function drawIcon(ctx, frame, opt) {
-  const { unit, palette, detail } = opt;
+  const { unit, palette, detail, semantic } = opt;
   const radius = 10 + Math.sin(frame) * 1.5;
   ctx.fillStyle = palette[0];
   ctx.beginPath();
@@ -288,8 +410,21 @@ function drawIcon(ctx, frame, opt) {
     const angle = (Math.PI * 2 * i) / (detail + 4) + frame * 0.25;
     rect(ctx, 15 + Math.cos(angle) * 8, 15 + Math.sin(angle) * 8, 2, 2, palette[3], unit);
   }
-  rect(ctx, 13, 9, 6, 14, palette[4], unit);
-  rect(ctx, 9, 13, 14, 6, palette[4], unit);
+  if (semantic.thunder) {
+    rect(ctx, 16, 6, 4, 9, palette[4], unit);
+    rect(ctx, 12, 14, 8, 3, palette[4], unit);
+    rect(ctx, 12, 16, 4, 10, palette[3], unit);
+  } else if (semantic.fire) {
+    rect(ctx, 13, 7 + Math.sin(frame), 6, 16, palette[3], unit);
+    rect(ctx, 15, 11, 3, 10, palette[4], unit);
+  } else if (semantic.ice) {
+    rect(ctx, 15, 6, 2, 20, palette[4], unit);
+    rect(ctx, 8, 15, 18, 2, palette[4], unit);
+    rect(ctx, 10, 10, 12, 12, palette[2], unit);
+  } else {
+    rect(ctx, 13, 9, 6, 14, palette[4], unit);
+    rect(ctx, 9, 13, 14, 6, palette[4], unit);
+  }
 }
 
 function drawFrame(target, frameIndex, size) {
