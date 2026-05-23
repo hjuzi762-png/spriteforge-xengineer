@@ -60,6 +60,42 @@ function rng(seed) {
   };
 }
 
+function analyzePrompt(prompt) {
+  const text = prompt.toLowerCase();
+  const has = (...words) => words.some((word) => text.includes(word));
+  return {
+    dark: has("暗黑", "黑暗", "dark", "shadow", "night"),
+    knight: has("骑士", "knight", "武士", "warrior", "剑士"),
+    purple: has("紫", "purple", "violet"),
+    fire: has("火", "flame", "fire", "焰"),
+    ice: has("冰", "ice", "frost"),
+    forest: has("森林", "forest", "green", "自然"),
+    cyber: has("赛博", "cyber", "neon", "科幻"),
+  };
+}
+
+function derivePalette(basePalette, semantic) {
+  if (semantic.dark && semantic.purple) {
+    return ["#090713", "#1b102b", "#5b21b6", "#a855f7", "#f5d0fe"];
+  }
+  if (semantic.dark) {
+    return ["#090b10", "#1f2430", "#59606f", "#9ca3af", "#f4f7fb"];
+  }
+  if (semantic.purple) {
+    return ["#151022", "#5b21b6", "#a855f7", "#f0abfc", "#fff7ff"];
+  }
+  if (semantic.fire) {
+    return ["#1c0b08", "#dc2626", "#f97316", "#facc15", "#fff7ed"];
+  }
+  if (semantic.ice) {
+    return ["#08131d", "#1d4ed8", "#60a5fa", "#bae6fd", "#f8fbff"];
+  }
+  if (semantic.forest) {
+    return ["#0b1610", "#15803d", "#65a30d", "#bef264", "#f7fee7"];
+  }
+  return basePalette;
+}
+
 function updatePalette() {
   const palette = $("#palette");
   palette.innerHTML = "";
@@ -91,6 +127,11 @@ function mirrorPixels(ctx, pixels, unit, cells) {
 }
 
 function drawCharacter(ctx, frame, opt) {
+  if (opt.semantic.dark && opt.semantic.knight) {
+    drawDarkKnight(ctx, frame, opt);
+    return;
+  }
+
   const { unit, cells, rand, palette } = opt;
   const bob = Math.sin(frame * 1.5) * 0.8;
   const body = palette[1];
@@ -116,6 +157,47 @@ function drawCharacter(ctx, frame, opt) {
     const y = 6 + rand() * 24;
     rect(ctx, x, y, 1, 1, rand() > 0.5 ? trim : light, unit);
   }
+}
+
+function drawDarkKnight(ctx, frame, opt) {
+  const { unit, palette, rand, detail } = opt;
+  const bob = Math.sin(frame * 1.4) * 0.7;
+  const outline = palette[0];
+  const armor = palette[1];
+  const purple = palette[2];
+  const glow = palette[3];
+  const highlight = palette[4];
+  const swordTilt = Math.sin(frame * 1.1) * 1.4;
+
+  rect(ctx, 10, 7 + bob, 12, 6, outline, unit);
+  rect(ctx, 12, 5 + bob, 8, 4, armor, unit);
+  rect(ctx, 9, 8 + bob, 2, 4, armor, unit);
+  rect(ctx, 21, 8 + bob, 2, 4, armor, unit);
+  rect(ctx, 13, 9 + bob, 2, 1, glow, unit);
+  rect(ctx, 17, 9 + bob, 2, 1, glow, unit);
+
+  rect(ctx, 9, 13 + bob, 14, 12, outline, unit);
+  rect(ctx, 11, 14 + bob, 10, 10, armor, unit);
+  rect(ctx, 13, 15 + bob, 6, 8, "#2b1847", unit);
+  rect(ctx, 15, 14 + bob, 2, 10, purple, unit);
+  rect(ctx, 10, 24 + bob, 4, 5, outline, unit);
+  rect(ctx, 18, 24 + bob, 4, 5, outline, unit);
+  rect(ctx, 9, 29 + bob, 6, 2, purple, unit);
+  rect(ctx, 17, 29 + bob, 6, 2, purple, unit);
+
+  rect(ctx, 6, 15 + bob, 4, 9, outline, unit);
+  rect(ctx, 22, 14 + bob, 3, 8, outline, unit);
+  rect(ctx, 24 + swordTilt, 8 + bob, 2, 18, glow, unit);
+  rect(ctx, 25 + swordTilt, 6 + bob, 1, 22, highlight, unit);
+  rect(ctx, 23 + swordTilt, 18 + bob, 5, 2, purple, unit);
+
+  ctx.globalAlpha = 0.35;
+  for (let i = 0; i < 8 + detail; i += 1) {
+    const x = 22 + rand() * 8 + swordTilt;
+    const y = 4 + rand() * 23 + bob;
+    rect(ctx, x, y, 1 + rand() * 1.8, 1 + rand() * 1.8, rand() > 0.45 ? glow : purple, unit);
+  }
+  ctx.globalAlpha = 1;
 }
 
 function drawItem(ctx, frame, opt) {
@@ -169,6 +251,8 @@ function drawFrame(target, frameIndex, size) {
   const promptHash = hashText(`${controls.prompt.value}|${controls.assetType.value}|${controls.stylePreset.value}`);
   const seed = promptHash + state.seed + frameIndex * 97;
   const rand = rng(seed);
+  const semantic = analyzePrompt(controls.prompt.value);
+  const palette = derivePalette(state.palette, semantic);
   const cells = 32;
   const unit = size / cells;
   ctx.clearRect(0, 0, size, size);
@@ -178,9 +262,10 @@ function drawFrame(target, frameIndex, size) {
     unit,
     cells,
     rand,
-    palette: state.palette,
+    palette,
     detail: Number(controls.detail.value),
     consistency: Number(controls.consistency.value),
+    semantic,
   };
 
   const type = controls.assetType.value;
