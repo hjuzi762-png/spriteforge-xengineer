@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SpriteForge 2D 游戏素材生成器</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="control-panel">
+        <div class="brand">
+          <div class="mark">SF</div>
+          <div>
+            <h1>SpriteForge</h1>
+            <p>文本驱动的 2D 游戏素材生成工作台</p>
+          </div>
+        </div>
+
+        <section class="panel-block">
+          <label for="prompt">素材描述</label>
+          <textarea id="prompt" rows="4">赛博武士，蓝色能量刀，适合横版动作游戏</textarea>
+          <div class="prompt-actions">
+            <button class="ghost" data-example="森林弓箭手，绿披风，待机动画">森林弓箭手</button>
+            <button class="ghost" data-example="火焰史莱姆，红橙渐变，弹跳动画">火焰史莱姆</button>
+            <button class="ghost" data-example="冰晶宝箱，蓝白高光，可作为掉落物">冰晶宝箱</button>
+          </div>
+        </section>
+
+        <section class="panel-grid">
+          <label>
+            素材类型
+            <select id="assetType">
+              <option value="character">角色</option>
+              <option value="item">道具</option>
+              <option value="tile">Tile 地块</option>
+              <option value="icon">技能图标</option>
+            </select>
+          </label>
+          <label>
+            风格
+            <select id="stylePreset">
+              <option value="pixel">像素风</option>
+              <option value="handpaint">手绘厚涂</option>
+              <option value="neon">霓虹科幻</option>
+              <option value="ink">水墨剪影</option>
+            </select>
+          </label>
+          <label>
+            画布尺寸
+            <select id="size">
+              <option value="64">64 x 64</option>
+              <option value="96">96 x 96</option>
+              <option value="128">128 x 128</option>
+            </select>
+          </label>
+          <label>
+            动画帧数
+            <input id="frames" type="number" min="1" max="8" value="4">
+          </label>
+        </section>
+
+        <section class="panel-block">
+          <div class="row-title">
+            <span>调色板</span>
+            <button id="randomPalette" class="icon-btn" title="随机调色">↻</button>
+          </div>
+          <div id="palette" class="palette"></div>
+        </section>
+
+        <section class="panel-block">
+          <div class="row-title">
+            <span>生成参数</span>
+            <span id="seedLabel">Seed 2451529</span>
+          </div>
+          <label class="range-line">
+            细节
+            <input id="detail" type="range" min="1" max="10" value="7">
+          </label>
+          <label class="range-line">
+            风格一致性
+            <input id="consistency" type="range" min="1" max="10" value="8">
+          </label>
+          <button id="generate" class="primary">生成素材</button>
+          <button id="generatePack" class="secondary">生成同风格资产包</button>
+        </section>
+      </aside>
+
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <h2>实时预览</h2>
+            <p id="summary">角色 · 像素风 · 4 帧 · 64px</p>
+          </div>
+          <div class="top-actions">
+            <button id="toggleGrid" class="tool-btn">网格</button>
+            <button id="downloadPng" class="tool-btn">PNG</button>
+            <button id="downloadSheet" class="tool-btn">Spritesheet</button>
+            <button id="downloadMeta" class="tool-btn">JSON</button>
+          </div>
+        </header>
+
+        <div class="stage-wrap">
+          <div class="stage">
+            <canvas id="preview" width="512" height="512"></canvas>
+          </div>
+          <div class="inspect">
+            <div>
+              <span class="metric" id="frameMetric">4</span>
+              <span>动画帧</span>
+            </div>
+            <div>
+              <span class="metric" id="costMetric">低</span>
+              <span>生成成本</span>
+            </div>
+            <div>
+              <span class="metric" id="pipelineMetric">Unity/Godot</span>
+              <span>工作流</span>
+            </div>
+          </div>
+        </div>
+
+        <section class="sheet-panel">
+          <div class="sheet-head">
+            <h2>Spritesheet 与导出清单</h2>
+            <p>每次生成都会同步生成透明背景序列帧、单张预览和元数据。</p>
+          </div>
+          <canvas id="sheet" width="512" height="128"></canvas>
+          <div id="manifest" class="manifest"></div>
+        </section>
+
+        <section class="pack-panel">
+          <div class="sheet-head">
+            <h2>项目风格包</h2>
+            <p>同一 prompt、seed、调色板与风格参数下生成一组可配套使用的 2D 游戏资产。</p>
+          </div>
+          <div id="assetPack" class="asset-pack"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
