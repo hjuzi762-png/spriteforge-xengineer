@@ -169,33 +169,39 @@ function drawDarkKnight(ctx, frame, opt) {
   const highlight = palette[4];
   const swordTilt = Math.sin(frame * 1.1) * 1.4;
 
-  rect(ctx, 10, 7 + bob, 12, 6, outline, unit);
-  rect(ctx, 12, 5 + bob, 8, 4, armor, unit);
-  rect(ctx, 9, 8 + bob, 2, 4, armor, unit);
-  rect(ctx, 21, 8 + bob, 2, 4, armor, unit);
-  rect(ctx, 13, 9 + bob, 2, 1, glow, unit);
-  rect(ctx, 17, 9 + bob, 2, 1, glow, unit);
+  rect(ctx, 6, 14 + bob, 8, 16, "#12091f", unit);
+  rect(ctx, 4, 18 + bob, 6, 10, "#0b0712", unit);
+  rect(ctx, 8, 9 + bob, 16, 7, outline, unit);
+  rect(ctx, 11, 6 + bob, 10, 5, armor, unit);
+  rect(ctx, 7, 7 + bob, 4, 3, purple, unit);
+  rect(ctx, 21, 7 + bob, 4, 3, purple, unit);
+  rect(ctx, 13, 10 + bob, 2, 1, glow, unit);
+  rect(ctx, 18, 10 + bob, 2, 1, glow, unit);
+  rect(ctx, 15, 12 + bob, 3, 1, highlight, unit);
 
-  rect(ctx, 9, 13 + bob, 14, 12, outline, unit);
-  rect(ctx, 11, 14 + bob, 10, 10, armor, unit);
-  rect(ctx, 13, 15 + bob, 6, 8, "#2b1847", unit);
-  rect(ctx, 15, 14 + bob, 2, 10, purple, unit);
-  rect(ctx, 10, 24 + bob, 4, 5, outline, unit);
-  rect(ctx, 18, 24 + bob, 4, 5, outline, unit);
-  rect(ctx, 9, 29 + bob, 6, 2, purple, unit);
-  rect(ctx, 17, 29 + bob, 6, 2, purple, unit);
+  rect(ctx, 7, 15 + bob, 18, 13, outline, unit);
+  rect(ctx, 9, 15 + bob, 14, 12, armor, unit);
+  rect(ctx, 11, 16 + bob, 10, 10, "#2b1847", unit);
+  rect(ctx, 14, 15 + bob, 4, 12, purple, unit);
+  rect(ctx, 9, 14 + bob, 5, 3, purple, unit);
+  rect(ctx, 19, 14 + bob, 5, 3, purple, unit);
+  rect(ctx, 9, 27 + bob, 5, 4, outline, unit);
+  rect(ctx, 18, 27 + bob, 5, 4, outline, unit);
+  rect(ctx, 8, 31 + bob, 7, 2, purple, unit);
+  rect(ctx, 17, 31 + bob, 7, 2, purple, unit);
 
-  rect(ctx, 6, 15 + bob, 4, 9, outline, unit);
-  rect(ctx, 22, 14 + bob, 3, 8, outline, unit);
-  rect(ctx, 24 + swordTilt, 8 + bob, 2, 18, glow, unit);
-  rect(ctx, 25 + swordTilt, 6 + bob, 1, 22, highlight, unit);
-  rect(ctx, 23 + swordTilt, 18 + bob, 5, 2, purple, unit);
+  rect(ctx, 4, 16 + bob, 5, 11, outline, unit);
+  rect(ctx, 23, 15 + bob, 3, 8, outline, unit);
+  rect(ctx, 25 + swordTilt, 4 + bob, 3, 25, glow, unit);
+  rect(ctx, 26 + swordTilt, 2 + bob, 1, 29, highlight, unit);
+  rect(ctx, 24 + swordTilt, 7 + bob, 5, 3, purple, unit);
+  rect(ctx, 23 + swordTilt, 18 + bob, 7, 2, purple, unit);
 
   ctx.globalAlpha = 0.35;
-  for (let i = 0; i < 8 + detail; i += 1) {
-    const x = 22 + rand() * 8 + swordTilt;
-    const y = 4 + rand() * 23 + bob;
-    rect(ctx, x, y, 1 + rand() * 1.8, 1 + rand() * 1.8, rand() > 0.45 ? glow : purple, unit);
+  for (let i = 0; i < 12 + detail * 2; i += 1) {
+    const x = 22 + rand() * 9 + swordTilt;
+    const y = 1 + rand() * 29 + bob;
+    rect(ctx, x, y, 1 + rand() * 2.2, 1 + rand() * 2.2, rand() > 0.4 ? glow : purple, unit);
   }
   ctx.globalAlpha = 1;
 }
