@@ -66,6 +66,7 @@ function analyzePrompt(prompt) {
   return {
     dark: has("暗黑", "黑暗", "dark", "shadow", "night"),
     knight: has("骑士", "knight", "武士", "warrior", "剑士"),
+    chest: has("宝箱", "箱子", "chest", "treasure"),
     purple: has("紫", "purple", "violet"),
     fire: has("火", "flame", "fire", "焰"),
     ice: has("冰", "ice", "frost"),
@@ -207,6 +208,11 @@ function drawDarkKnight(ctx, frame, opt) {
 }
 
 function drawItem(ctx, frame, opt) {
+  if (opt.semantic.chest) {
+    drawChest(ctx, frame, opt);
+    return;
+  }
+
   const { unit, rand, palette, detail } = opt;
   const pulse = Math.sin(frame * 1.3) * 1.2;
   rect(ctx, 10, 10 - pulse, 12, 12, palette[1], unit);
@@ -217,6 +223,40 @@ function drawItem(ctx, frame, opt) {
   for (let i = 0; i < 10 + detail; i += 1) {
     rect(ctx, 4 + rand() * 24, 5 + rand() * 24, 1, 1, palette[2 + (i % 3)], unit);
   }
+}
+
+function drawChest(ctx, frame, opt) {
+  const { unit, rand, palette, detail, semantic } = opt;
+  const pulse = Math.sin(frame * 1.2) * 0.5;
+  const outline = semantic.ice ? "#071827" : palette[0];
+  const body = semantic.ice ? "#1d4ed8" : palette[1];
+  const lid = semantic.ice ? "#60a5fa" : palette[2];
+  const trim = semantic.ice ? "#bae6fd" : palette[3];
+  const shine = semantic.ice ? "#f8fbff" : palette[4];
+
+  rect(ctx, 6, 12 + pulse, 20, 4, outline, unit);
+  rect(ctx, 7, 9 + pulse, 18, 5, lid, unit);
+  rect(ctx, 9, 7 + pulse, 14, 3, trim, unit);
+  rect(ctx, 6, 15 + pulse, 20, 12, outline, unit);
+  rect(ctx, 8, 16 + pulse, 16, 9, body, unit);
+  rect(ctx, 8, 16 + pulse, 16, 2, trim, unit);
+  rect(ctx, 14, 15 + pulse, 4, 11, outline, unit);
+  rect(ctx, 15, 18 + pulse, 2, 4, shine, unit);
+  rect(ctx, 10, 20 + pulse, 3, 2, "#3b82f6", unit);
+  rect(ctx, 19, 20 + pulse, 3, 2, "#3b82f6", unit);
+
+  if (semantic.ice) {
+    rect(ctx, 5, 10 + pulse, 2, 5, shine, unit);
+    rect(ctx, 25, 10 + pulse, 2, 5, shine, unit);
+    rect(ctx, 11, 5 + pulse, 2, 4, trim, unit);
+    rect(ctx, 20, 5 + pulse, 2, 4, trim, unit);
+  }
+
+  ctx.globalAlpha = 0.45;
+  for (let i = 0; i < 8 + detail; i += 1) {
+    rect(ctx, 4 + rand() * 24, 4 + rand() * 24, 1 + rand() * 1.5, 1 + rand() * 1.5, rand() > 0.5 ? shine : trim, unit);
+  }
+  ctx.globalAlpha = 1;
 }
 
 function drawTile(ctx, frame, opt) {
