@@ -9,6 +9,9 @@ const state = {
   lastTick: 0,
   authMode: "login",
   user: null,
+  authChallenge: 0,
+  authFailures: 0,
+  lockUntil: 0,
   uploadedImage: null,
   uploadedName: "",
   useUploadedImage: false,
@@ -84,12 +87,51 @@ function writeStorage(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+function refreshCaptcha() {
+  const left = Math.floor(Math.random() * 8) + 2;
+  const right = Math.floor(Math.random() * 8) + 2;
+  state.authChallenge = left + right;
+  $("#captchaQuestion").textContent = `${left} + ${right} = ?`;
+  $("#captchaAnswer").value = "";
+}
+
+function passwordStrength(password) {
+  let score = 0;
+  if (password.length >= 8) score += 1;
+  if (/[a-zA-Z]/.test(password)) score += 1;
+  if (/\d/.test(password)) score += 1;
+  if (/[^a-zA-Z0-9]/.test(password)) score += 1;
+  return score;
+}
+
+function validateAuthInput(name, password, confirmPassword) {
+  if (!/^[\u4e00-\u9fa5\w-]{3,18}$/.test(name)) {
+    return "用户名需为 3-18 位中文、字母、数字、下划线或短横线。";
+  }
+  if (passwordStrength(password) < 3) {
+    return "密码至少 8 位，并包含字母、数字，建议再加入符号。";
+  }
+  if (state.authMode === "register" && password !== confirmPassword) {
+    return "两次输入的密码不一致。";
+  }
+  if (Number($("#captchaAnswer").value.trim()) !== state.authChallenge) {
+    refreshCaptcha();
+    return "验证码不正确，请重新计算。";
+  }
+  return "";
+}
+
 function setAuthMode(mode) {
   state.authMode = mode;
   $("#loginTab").classList.toggle("active", mode === "login");
   $("#registerTab").classList.toggle("active", mode === "register");
   $("#authSubmit").textContent = mode === "login" ? "登录" : "注册";
+  document.querySelectorAll(".register-only").forEach((node) => {
+    node.classList.toggle("hidden", mode !== "register");
+  });
+  $("#authPassword").autocomplete = mode === "login" ? "current-password" : "new-password";
   $("#authMessage").textContent = "";
+  refreshCaptcha();
 }
 
 function renderAuth() {
@@ -98,6 +140,8 @@ function renderAuth() {
   $("#authName").value = loggedIn ? state.user : $("#authName").value;
   $("#authName").disabled = loggedIn;
   $("#authPassword").disabled = loggedIn;
+  $("#authConfirm").disabled = loggedIn;
+  $("#captchaAnswer").disabled = loggedIn;
   $("#authSubmit").classList.toggle("hidden", loggedIn);
   $("#logout").classList.toggle("hidden", !loggedIn);
   $("#authMessage").textContent = loggedIn ? "已登录，导出的 JSON 会记录作者和最近生成历史。" : "";
@@ -106,14 +150,18 @@ function renderAuth() {
 function submitAuth() {
   const name = $("#authName").value.trim();
   const password = $("#authPassword").value;
+  const confirmPassword = $("#authConfirm").value;
   const users = readStorage(storageKeys.users, {});
 
-  if (!/^[\u4e00-\u9fa5\w-]{2,18}$/.test(name)) {
-    $("#authMessage").textContent = "用户名需为 2-18 位中文、字母、数字、下划线或短横线。";
+  if (Date.now() < state.lockUntil) {
+    const seconds = Math.ceil((state.lockUntil - Date.now()) / 1000);
+    $("#authMessage").textContent = `验证失败过多，请 ${seconds} 秒后再试。`;
     return;
   }
-  if (password.length < 6) {
-    $("#authMessage").textContent = "密码至少 6 位。";
+
+  const validationMessage = validateAuthInput(name, password, confirmPassword);
+  if (validationMessage) {
+    $("#authMessage").textContent = validationMessage;
     return;
   }
 
@@ -127,12 +175,21 @@ function submitAuth() {
     writeStorage(storageKeys.users, users);
     $("#authMessage").textContent = "注册成功，已自动登录。";
   } else if (!users[name] || users[name].passwordHash !== passwordHash) {
+    state.authFailures += 1;
+    if (state.authFailures >= 5) {
+      state.lockUntil = Date.now() + 30 * 1000;
+      state.authFailures = 0;
+    }
+    refreshCaptcha();
     $("#authMessage").textContent = "用户名或密码不正确。";
     return;
   }
 
+  state.authFailures = 0;
   state.user = name;
   writeStorage(storageKeys.session, { user: name });
+  $("#authConfirm").value = "";
+  refreshCaptcha();
   renderAuth();
 }
 
@@ -140,6 +197,8 @@ function logout() {
   state.user = null;
   localStorage.removeItem(storageKeys.session);
   $("#authPassword").value = "";
+  $("#authConfirm").value = "";
+  refreshCaptcha();
   renderAuth();
 }
 
@@ -566,7 +625,7 @@ function drawUploadedFrame(target, frameIndex, size) {
   const shrinkScale = motion.shrink ? 1 - Math.abs(wave) * 0.16 : 1;
   const breathe = 1 + Math.sin(phase) * 0.025;
   const scale = growScale * shrinkScale * breathe;
-  const drawSize = size * 0.72;
+  const drawSize = size * 0.86;
   const ratio = Math.min(drawSize / image.width, drawSize / image.height);
   const width = image.width * ratio;
   const height = image.height * ratio;
@@ -574,7 +633,8 @@ function drawUploadedFrame(target, frameIndex, size) {
   const y = size / 2 + hop + floatY;
 
   ctx.clearRect(0, 0, size, size);
-  ctx.imageSmoothingEnabled = controls.stylePreset.value !== "pixel" && !motion.pixelate;
+  ctx.imageSmoothingEnabled = !motion.pixelate;
+  ctx.imageSmoothingQuality = "high";
 
   if (motion.ghost || motion.run || motion.glow) {
     for (let i = 1; i <= 3; i += 1) {
@@ -596,9 +656,9 @@ function drawUploadedFrame(target, frameIndex, size) {
   ctx.shadowColor = motion.thunder ? "#7dd3fc" : motion.fire ? "#fb923c" : motion.ice ? "#bae6fd" : palette[3];
   ctx.shadowBlur = motion.glow || motion.fire || motion.ice || motion.thunder ? size * 0.08 : 0;
 
-  if (motion.pixelate || controls.stylePreset.value === "pixel") {
+  if (motion.pixelate) {
     const temp = document.createElement("canvas");
-    const small = 32;
+    const small = Math.max(64, Math.min(128, Math.floor(size / 3)));
     temp.width = small;
     temp.height = small;
     const tctx = temp.getContext("2d");
@@ -784,7 +844,9 @@ function generate() {
 function renderPreview() {
   if (!state.frames.length) return;
   pctx.clearRect(0, 0, 512, 512);
-  pctx.imageSmoothingEnabled = controls.stylePreset.value !== "pixel";
+  const uploadedPixelated = state.useUploadedImage && analyzeMotion(`${controls.motionPrompt.value} ${controls.prompt.value}`).pixelate;
+  pctx.imageSmoothingEnabled = state.useUploadedImage ? !uploadedPixelated : controls.stylePreset.value !== "pixel";
+  pctx.imageSmoothingQuality = "high";
   pctx.drawImage(state.frames[state.activeFrame], 64, 64, 384, 384);
   drawGrid(pctx, 512, 512 / 16);
 }
@@ -905,9 +967,12 @@ $("#imageUpload").addEventListener("change", (event) => {
       state.uploadedImage = image;
       state.uploadedName = file.name;
       state.useUploadedImage = false;
+      if (Number(controls.size.value) < 256) {
+        controls.size.value = "256";
+      }
       $("#imageStatus").textContent = "已上传";
       if (!controls.motionPrompt.value.trim()) {
-        controls.motionPrompt.value = "轻微呼吸，向右奔跑，带发光拖尾";
+        controls.motionPrompt.value = "高清保真，轻微呼吸，向右奔跑，带发光拖尾";
       }
       updateSummary();
     });

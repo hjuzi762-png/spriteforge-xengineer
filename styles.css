@@ -152,6 +152,24 @@ input[type="password"]:focus {
   gap: 8px;
 }
 
+.captcha-line {
+  display: grid;
+  grid-template-columns: minmax(82px, auto) 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.captcha-line span {
+  display: grid;
+  place-items: center;
+  min-height: 38px;
+  border-radius: 8px;
+  background: #111619;
+  color: #f8d96a;
+  font-size: 13px;
+  font-weight: 900;
+}
+
 .auth-form p {
   min-height: 18px;
   color: #f8d96a;
@@ -338,7 +356,7 @@ input[type="range"] {
 
 canvas {
   max-width: 100%;
-  image-rendering: pixelated;
+  image-rendering: auto;
 }
 
 .inspect {
