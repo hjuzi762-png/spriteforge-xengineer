@@ -14,6 +14,7 @@ const state = {
   lockUntil: 0,
   uploadedImage: null,
   uploadedName: "",
+  uploadedSubjectBox: null,
   useUploadedImage: false,
 };
 
@@ -584,6 +585,117 @@ function drawIcon(ctx, frame, opt) {
   }
 }
 
+function colorDistance(a, b) {
+  const dr = a[0] - b[0];
+  const dg = a[1] - b[1];
+  const db = a[2] - b[2];
+  return Math.sqrt(dr * dr + dg * dg + db * db);
+}
+
+function detectSubjectBox(image) {
+  const maxProbe = 240;
+  const scale = Math.min(maxProbe / image.width, maxProbe / image.height, 1);
+  const width = Math.max(1, Math.round(image.width * scale));
+  const height = Math.max(1, Math.round(image.height * scale));
+  const probe = document.createElement("canvas");
+  probe.width = width;
+  probe.height = height;
+  const ctx = probe.getContext("2d", { willReadFrequently: true });
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(image, 0, 0, width, height);
+  const pixels = ctx.getImageData(0, 0, width, height).data;
+  const edge = Math.max(4, Math.round(Math.min(width, height) * 0.08));
+  const bg = [0, 0, 0];
+  let bgCount = 0;
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (x >= edge && x < width - edge && y >= edge && y < height - edge) continue;
+      const i = (y * width + x) * 4;
+      if (pixels[i + 3] < 20) continue;
+      bg[0] += pixels[i];
+      bg[1] += pixels[i + 1];
+      bg[2] += pixels[i + 2];
+      bgCount += 1;
+    }
+  }
+
+  if (!bgCount) {
+    return { x: 0, y: 0, width: image.width, height: image.height };
+  }
+
+  bg[0] /= bgCount;
+  bg[1] /= bgCount;
+  bg[2] /= bgCount;
+
+  let minX = width;
+  let minY = height;
+  let maxX = 0;
+  let maxY = 0;
+  let count = 0;
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const maxDist = Math.hypot(centerX, centerY);
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const i = (y * width + x) * 4;
+      if (pixels[i + 3] < 30) continue;
+      const r = pixels[i];
+      const g = pixels[i + 1];
+      const b = pixels[i + 2];
+      const dist = colorDistance([r, g, b], bg);
+      const maxC = Math.max(r, g, b);
+      const minC = Math.min(r, g, b);
+      const saturation = maxC - minC;
+      const darkness = 255 - (r + g + b) / 3;
+      const centerWeight = 1 - Math.hypot(x - centerX, y - centerY) / maxDist;
+      const subjectLike = dist > 42 || saturation > 42 || darkness > 84;
+      const nearCenter = centerWeight > 0.18;
+      if (!subjectLike || !nearCenter) continue;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+      count += 1;
+    }
+  }
+
+  if (count < width * height * 0.015) {
+    const cropWidth = width * 0.62;
+    const cropHeight = height * 0.82;
+    minX = (width - cropWidth) / 2;
+    maxX = minX + cropWidth;
+    minY = (height - cropHeight) / 2;
+    maxY = minY + cropHeight;
+  }
+
+  const boxWidth = maxX - minX;
+  const boxHeight = maxY - minY;
+  const tooWide = boxWidth > width * 0.92 && boxHeight > height * 0.92;
+  if (tooWide) {
+    minX = width * 0.18;
+    maxX = width * 0.82;
+    minY = height * 0.06;
+    maxY = height * 0.96;
+  }
+
+  const padX = (maxX - minX) * 0.16;
+  const padY = (maxY - minY) * 0.12;
+  const sx = Math.max(0, (minX - padX) / scale);
+  const sy = Math.max(0, (minY - padY) / scale);
+  const ex = Math.min(image.width, (maxX + padX) / scale);
+  const ey = Math.min(image.height, (maxY + padY) / scale);
+
+  return {
+    x: sx,
+    y: sy,
+    width: Math.max(1, ex - sx),
+    height: Math.max(1, ey - sy),
+  };
+}
+
 function analyzeMotion(text) {
   const lower = text.toLowerCase();
   const has = (...words) => words.some((word) => lower.includes(word));
@@ -608,6 +720,7 @@ function analyzeMotion(text) {
 function drawUploadedFrame(target, frameIndex, size) {
   const ctx = target.getContext("2d");
   const image = state.uploadedImage;
+  const subject = state.uploadedSubjectBox ?? { x: 0, y: 0, width: image.width, height: image.height };
   const frameCount = Math.max(1, Number(controls.frames.value));
   const progress = frameIndex / frameCount;
   const phase = progress * Math.PI * 2;
@@ -625,10 +738,10 @@ function drawUploadedFrame(target, frameIndex, size) {
   const shrinkScale = motion.shrink ? 1 - Math.abs(wave) * 0.16 : 1;
   const breathe = 1 + Math.sin(phase) * 0.025;
   const scale = growScale * shrinkScale * breathe;
-  const drawSize = size * 0.86;
-  const ratio = Math.min(drawSize / image.width, drawSize / image.height);
-  const width = image.width * ratio;
-  const height = image.height * ratio;
+  const drawSize = size * 0.9;
+  const ratio = Math.min(drawSize / subject.width, drawSize / subject.height);
+  const width = subject.width * ratio;
+  const height = subject.height * ratio;
   const x = size / 2 + runX + shakeX;
   const y = size / 2 + hop + floatY;
 
@@ -644,7 +757,7 @@ function drawUploadedFrame(target, frameIndex, size) {
       ctx.rotate(attackAngle + spinAngle - i * 0.05);
       ctx.scale(scale, scale);
       ctx.filter = "saturate(1.25)";
-      ctx.drawImage(image, -width / 2, -height / 2, width, height);
+      ctx.drawImage(image, subject.x, subject.y, subject.width, subject.height, -width / 2, -height / 2, width, height);
       ctx.restore();
     }
   }
@@ -663,11 +776,11 @@ function drawUploadedFrame(target, frameIndex, size) {
     temp.height = small;
     const tctx = temp.getContext("2d");
     tctx.imageSmoothingEnabled = true;
-    tctx.drawImage(image, (small - width / (size / small)) / 2, (small - height / (size / small)) / 2, width / (size / small), height / (size / small));
+    tctx.drawImage(image, subject.x, subject.y, subject.width, subject.height, (small - width / (size / small)) / 2, (small - height / (size / small)) / 2, width / (size / small), height / (size / small));
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(temp, -width / 2, -height / 2, width, height);
   } else {
-    ctx.drawImage(image, -width / 2, -height / 2, width, height);
+    ctx.drawImage(image, subject.x, subject.y, subject.width, subject.height, -width / 2, -height / 2, width, height);
   }
   ctx.restore();
 
@@ -817,9 +930,9 @@ function generate() {
   const size = Number(controls.size.value);
   const frameCount = Number(controls.frames.value);
   state.frames = [];
-  preview.width = 512;
-  preview.height = 512;
-  pctx.clearRect(0, 0, 512, 512);
+  preview.width = 768;
+  preview.height = 768;
+  pctx.clearRect(0, 0, preview.width, preview.height);
 
   for (let i = 0; i < frameCount; i += 1) {
     const off = document.createElement("canvas");
@@ -843,12 +956,21 @@ function generate() {
 
 function renderPreview() {
   if (!state.frames.length) return;
-  pctx.clearRect(0, 0, 512, 512);
+  const previewSize = preview.width;
+  pctx.clearRect(0, 0, previewSize, previewSize);
   const uploadedPixelated = state.useUploadedImage && analyzeMotion(`${controls.motionPrompt.value} ${controls.prompt.value}`).pixelate;
-  pctx.imageSmoothingEnabled = state.useUploadedImage ? !uploadedPixelated : controls.stylePreset.value !== "pixel";
+  const crispPreview = uploadedPixelated || (!state.useUploadedImage && controls.stylePreset.value === "pixel");
+  preview.classList.toggle("crisp-preview", crispPreview);
+  preview.classList.toggle("smooth-preview", !crispPreview);
+  pctx.imageSmoothingEnabled = !crispPreview;
   pctx.imageSmoothingQuality = "high";
-  pctx.drawImage(state.frames[state.activeFrame], 64, 64, 384, 384);
-  drawGrid(pctx, 512, 512 / 16);
+  const source = state.frames[state.activeFrame];
+  const maxDraw = previewSize * 0.86;
+  const drawSize = state.useUploadedImage ? Math.min(maxDraw, Math.max(source.width, 512)) : maxDraw;
+  const x = (previewSize - drawSize) / 2;
+  const y = (previewSize - drawSize) / 2;
+  pctx.drawImage(source, x, y, drawSize, drawSize);
+  drawGrid(pctx, previewSize, previewSize / 16);
 }
 
 function animate(timestamp) {
@@ -966,11 +1088,12 @@ $("#imageUpload").addEventListener("change", (event) => {
     image.addEventListener("load", () => {
       state.uploadedImage = image;
       state.uploadedName = file.name;
+      state.uploadedSubjectBox = detectSubjectBox(image);
       state.useUploadedImage = false;
-      if (Number(controls.size.value) < 256) {
-        controls.size.value = "256";
+      if (Number(controls.size.value) < 512) {
+        controls.size.value = "512";
       }
-      $("#imageStatus").textContent = "已上传";
+      $("#imageStatus").textContent = "已识别主体";
       if (!controls.motionPrompt.value.trim()) {
         controls.motionPrompt.value = "高清保真，轻微呼吸，向右奔跑，带发光拖尾";
       }

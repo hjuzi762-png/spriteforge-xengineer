@@ -359,6 +359,14 @@ canvas {
   image-rendering: auto;
 }
 
+.crisp-preview {
+  image-rendering: pixelated;
+}
+
+.smooth-preview {
+  image-rendering: auto;
+}
+
 .inspect {
   display: grid;
   grid-template-columns: repeat(4, minmax(110px, 1fr));
