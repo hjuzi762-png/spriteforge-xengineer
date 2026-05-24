@@ -7,6 +7,11 @@ const state = {
   frames: [],
   activeFrame: 0,
   lastTick: 0,
+  authMode: "login",
+  user: null,
+  uploadedImage: null,
+  uploadedName: "",
+  useUploadedImage: false,
 };
 
 const palettes = [
@@ -25,6 +30,7 @@ const controls = {
   frames: $("#frames"),
   detail: $("#detail"),
   consistency: $("#consistency"),
+  motionPrompt: $("#motionPrompt"),
 };
 
 const packItems = [
@@ -39,6 +45,12 @@ const preview = $("#preview");
 const sheet = $("#sheet");
 const pctx = preview.getContext("2d");
 const sctx = sheet.getContext("2d");
+
+const storageKeys = {
+  users: "spriteforge_users_v1",
+  session: "spriteforge_session_v1",
+  history: "spriteforge_history_v1",
+};
 
 function hashText(text) {
   let hash = 2166136261;
@@ -58,6 +70,92 @@ function rng(seed) {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+function readStorage(key, fallback) {
+  try {
+    return JSON.parse(localStorage.getItem(key)) ?? fallback;
+  } catch (error) {
+    return fallback;
+  }
+}
+
+function writeStorage(key, value) {
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
+function setAuthMode(mode) {
+  state.authMode = mode;
+  $("#loginTab").classList.toggle("active", mode === "login");
+  $("#registerTab").classList.toggle("active", mode === "register");
+  $("#authSubmit").textContent = mode === "login" ? "登录" : "注册";
+  $("#authMessage").textContent = "";
+}
+
+function renderAuth() {
+  const loggedIn = Boolean(state.user);
+  $("#authStatus").textContent = loggedIn ? state.user : "未登录";
+  $("#authName").value = loggedIn ? state.user : $("#authName").value;
+  $("#authName").disabled = loggedIn;
+  $("#authPassword").disabled = loggedIn;
+  $("#authSubmit").classList.toggle("hidden", loggedIn);
+  $("#logout").classList.toggle("hidden", !loggedIn);
+  $("#authMessage").textContent = loggedIn ? "已登录，导出的 JSON 会记录作者和最近生成历史。" : "";
+}
+
+function submitAuth() {
+  const name = $("#authName").value.trim();
+  const password = $("#authPassword").value;
+  const users = readStorage(storageKeys.users, {});
+
+  if (!/^[\u4e00-\u9fa5\w-]{2,18}$/.test(name)) {
+    $("#authMessage").textContent = "用户名需为 2-18 位中文、字母、数字、下划线或短横线。";
+    return;
+  }
+  if (password.length < 6) {
+    $("#authMessage").textContent = "密码至少 6 位。";
+    return;
+  }
+
+  const passwordHash = hashText(`${name}|${password}|spriteforge`);
+  if (state.authMode === "register") {
+    if (users[name]) {
+      $("#authMessage").textContent = "这个用户名已注册。";
+      return;
+    }
+    users[name] = { passwordHash, createdAt: new Date().toISOString() };
+    writeStorage(storageKeys.users, users);
+    $("#authMessage").textContent = "注册成功，已自动登录。";
+  } else if (!users[name] || users[name].passwordHash !== passwordHash) {
+    $("#authMessage").textContent = "用户名或密码不正确。";
+    return;
+  }
+
+  state.user = name;
+  writeStorage(storageKeys.session, { user: name });
+  renderAuth();
+}
+
+function logout() {
+  state.user = null;
+  localStorage.removeItem(storageKeys.session);
+  $("#authPassword").value = "";
+  renderAuth();
+}
+
+function recordGeneration() {
+  if (!state.user) return;
+  const history = readStorage(storageKeys.history, {});
+  const list = history[state.user] ?? [];
+  list.unshift({
+    time: new Date().toISOString(),
+    prompt: controls.prompt.value,
+    source: state.useUploadedImage ? "uploaded-image" : "procedural",
+    motion: controls.motionPrompt.value.trim(),
+    seed: state.seed,
+  });
+  history[state.user] = list.slice(0, 12);
+  writeStorage(storageKeys.history, history);
 }
 
 function analyzePrompt(prompt) {
@@ -427,6 +525,145 @@ function drawIcon(ctx, frame, opt) {
   }
 }
 
+function analyzeMotion(text) {
+  const lower = text.toLowerCase();
+  const has = (...words) => words.some((word) => lower.includes(word));
+  return {
+    jump: has("跳", "弹", "跃", "jump", "bounce"),
+    run: has("跑", "奔", "冲刺", "run", "dash"),
+    attack: has("攻击", "挥", "砍", "斩", "刺", "attack", "slash", "swing"),
+    fly: has("飞", "漂浮", "悬浮", "float", "fly"),
+    rotate: has("旋转", "翻滚", "转身", "rotate", "spin"),
+    grow: has("变大", "放大", "膨胀", "grow", "bigger"),
+    shrink: has("缩小", "收缩", "shrink", "smaller"),
+    shake: has("抖", "震动", "受击", "shake", "hit"),
+    ghost: has("残影", "分身", "影子", "ghost", "clone"),
+    pixelate: has("像素", "pixel"),
+    fire: has("火", "火焰", "燃烧", "fire", "flame"),
+    ice: has("冰", "冰霜", "冻结", "ice", "frost"),
+    thunder: has("雷", "电", "闪电", "thunder", "lightning"),
+    glow: has("发光", "光环", "拖尾", "glow", "trail"),
+  };
+}
+
+function drawUploadedFrame(target, frameIndex, size) {
+  const ctx = target.getContext("2d");
+  const image = state.uploadedImage;
+  const frameCount = Math.max(1, Number(controls.frames.value));
+  const progress = frameIndex / frameCount;
+  const phase = progress * Math.PI * 2;
+  const motion = analyzeMotion(`${controls.motionPrompt.value} ${controls.prompt.value}`);
+  const semantic = analyzePrompt(`${controls.motionPrompt.value} ${controls.prompt.value}`);
+  const palette = derivePalette(state.palette, semantic);
+  const wave = Math.sin(phase);
+  const hop = motion.jump ? -Math.abs(wave) * size * 0.18 : 0;
+  const floatY = motion.fly ? Math.sin(phase + 0.8) * size * 0.08 : 0;
+  const runX = motion.run ? (progress - 0.5) * size * 0.22 : 0;
+  const shakeX = motion.shake ? Math.sin(phase * 4) * size * 0.035 : 0;
+  const attackAngle = motion.attack ? Math.sin(phase) * 0.24 : 0;
+  const spinAngle = motion.rotate ? phase : 0;
+  const growScale = motion.grow ? 1 + Math.abs(wave) * 0.18 : 1;
+  const shrinkScale = motion.shrink ? 1 - Math.abs(wave) * 0.16 : 1;
+  const breathe = 1 + Math.sin(phase) * 0.025;
+  const scale = growScale * shrinkScale * breathe;
+  const drawSize = size * 0.72;
+  const ratio = Math.min(drawSize / image.width, drawSize / image.height);
+  const width = image.width * ratio;
+  const height = image.height * ratio;
+  const x = size / 2 + runX + shakeX;
+  const y = size / 2 + hop + floatY;
+
+  ctx.clearRect(0, 0, size, size);
+  ctx.imageSmoothingEnabled = controls.stylePreset.value !== "pixel" && !motion.pixelate;
+
+  if (motion.ghost || motion.run || motion.glow) {
+    for (let i = 1; i <= 3; i += 1) {
+      ctx.save();
+      ctx.globalAlpha = 0.1 + i * 0.05;
+      ctx.translate(x - i * size * 0.055, y + i * 1.5);
+      ctx.rotate(attackAngle + spinAngle - i * 0.05);
+      ctx.scale(scale, scale);
+      ctx.filter = "saturate(1.25)";
+      ctx.drawImage(image, -width / 2, -height / 2, width, height);
+      ctx.restore();
+    }
+  }
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(attackAngle + spinAngle);
+  ctx.scale(scale, scale);
+  ctx.shadowColor = motion.thunder ? "#7dd3fc" : motion.fire ? "#fb923c" : motion.ice ? "#bae6fd" : palette[3];
+  ctx.shadowBlur = motion.glow || motion.fire || motion.ice || motion.thunder ? size * 0.08 : 0;
+
+  if (motion.pixelate || controls.stylePreset.value === "pixel") {
+    const temp = document.createElement("canvas");
+    const small = 32;
+    temp.width = small;
+    temp.height = small;
+    const tctx = temp.getContext("2d");
+    tctx.imageSmoothingEnabled = true;
+    tctx.drawImage(image, (small - width / (size / small)) / 2, (small - height / (size / small)) / 2, width / (size / small), height / (size / small));
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(temp, -width / 2, -height / 2, width, height);
+  } else {
+    ctx.drawImage(image, -width / 2, -height / 2, width, height);
+  }
+  ctx.restore();
+
+  drawMotionEffects(ctx, frameIndex, size, motion, palette, x, y, width, height);
+}
+
+function drawMotionEffects(ctx, frameIndex, size, motion, palette, x, y, width, height) {
+  const frameCount = Math.max(1, Number(controls.frames.value));
+  const progress = frameIndex / frameCount;
+  const phase = progress * Math.PI * 2;
+  const accent = motion.thunder ? "#facc15" : motion.fire ? "#fb923c" : motion.ice ? "#bae6fd" : palette[3];
+  const light = motion.thunder ? "#7dd3fc" : motion.fire ? "#fff7ed" : motion.ice ? "#f8fbff" : palette[4];
+
+  if (motion.run || motion.jump) {
+    ctx.globalAlpha = 0.45;
+    ctx.fillStyle = palette[0];
+    for (let i = 0; i < 5; i += 1) {
+      const dustX = x - width * 0.35 - i * size * 0.035;
+      const dustY = y + height * 0.34 + Math.sin(phase + i) * 3;
+      ctx.fillRect(dustX, dustY, size * 0.035, size * 0.012);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  if (motion.attack) {
+    ctx.save();
+    ctx.translate(x + width * 0.22, y - height * 0.12);
+    ctx.rotate(Math.sin(phase) * 0.28);
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = Math.max(3, size * 0.035);
+    ctx.globalAlpha = 0.82;
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.24, -0.8, 0.95);
+    ctx.stroke();
+    ctx.strokeStyle = light;
+    ctx.lineWidth = Math.max(1, size * 0.012);
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.29, -0.55, 0.75);
+    ctx.stroke();
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  if (motion.fire || motion.ice || motion.thunder || motion.glow) {
+    const rand = rng(state.seed + frameIndex * 193);
+    ctx.globalAlpha = 0.68;
+    for (let i = 0; i < 16; i += 1) {
+      const px = x - width * 0.42 + rand() * width * 0.84 + Math.sin(phase + i) * 5;
+      const py = y - height * 0.42 + rand() * height * 0.84 + Math.cos(phase + i) * 5;
+      ctx.fillStyle = rand() > 0.45 ? accent : light;
+      ctx.fillRect(px, py, 2 + rand() * 4, 2 + rand() * 4);
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
 function drawFrame(target, frameIndex, size) {
   const ctx = target.getContext("2d");
   const promptHash = hashText(`${controls.prompt.value}|${controls.assetType.value}|${controls.stylePreset.value}`);
@@ -528,7 +765,11 @@ function generate() {
     const off = document.createElement("canvas");
     off.width = size;
     off.height = size;
-    drawFrame(off, i, size);
+    if (state.useUploadedImage && state.uploadedImage) {
+      drawUploadedFrame(off, i, size);
+    } else {
+      drawFrame(off, i, size);
+    }
     state.frames.push(off);
   }
 
@@ -537,6 +778,7 @@ function generate() {
   drawSheet();
   renderManifest();
   updateSummary();
+  recordGeneration();
 }
 
 function renderPreview() {
@@ -572,6 +814,7 @@ function renderManifest() {
     ["格式", "PNG 透明背景 + JSON 元数据"],
     ["尺寸", `${controls.size.value}px / frame`],
     ["命名", "spriteforge_asset_{seed}.png"],
+    ["来源", state.useUploadedImage ? `上传图：${state.uploadedName}` : "文本程序化生成"],
     ["适配", "Unity Sprite Editor, Godot AnimatedSprite2D"],
   ];
   $("#manifest").innerHTML = manifest.map(([key, value]) => `<div><strong>${key}</strong><br>${value}</div>`).join("");
@@ -598,9 +841,11 @@ function renderAssetPack() {
 function updateSummary() {
   const typeName = controls.assetType.options[controls.assetType.selectedIndex].text;
   const styleName = controls.stylePreset.options[controls.stylePreset.selectedIndex].text;
-  $("#summary").textContent = `${typeName} · ${styleName} · ${controls.frames.value} 帧 · ${controls.size.value}px`;
+  const source = state.useUploadedImage ? "上传图片动作化" : typeName;
+  $("#summary").textContent = `${source} · ${styleName} · ${controls.frames.value} 帧 · ${controls.size.value}px`;
   $("#frameMetric").textContent = controls.frames.value;
   $("#seedLabel").textContent = `Seed ${state.seed}`;
+  $("#sourceMetric").textContent = state.useUploadedImage ? "图片" : "文本";
 }
 
 function downloadCanvas(canvas, filename) {
@@ -619,6 +864,10 @@ function downloadJson() {
     frameSize: Number(controls.size.value),
     frames: Number(controls.frames.value),
     palette: state.palette,
+    author: state.user ?? "guest",
+    source: state.useUploadedImage ? "uploaded-image" : "procedural-text",
+    uploadedImageName: state.uploadedName,
+    motionPrompt: controls.motionPrompt.value.trim(),
     stylePack: packItems.map((item) => ({
       name: item.title,
       type: item.type,
@@ -636,6 +885,54 @@ function downloadJson() {
   link.click();
   URL.revokeObjectURL(link.href);
 }
+
+$("#loginTab").addEventListener("click", () => setAuthMode("login"));
+$("#registerTab").addEventListener("click", () => setAuthMode("register"));
+$("#authSubmit").addEventListener("click", submitAuth);
+$("#logout").addEventListener("click", logout);
+$("#authPassword").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") submitAuth();
+});
+
+$("#imageUpload").addEventListener("change", (event) => {
+  const [file] = event.target.files;
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    const image = new Image();
+    image.addEventListener("load", () => {
+      state.uploadedImage = image;
+      state.uploadedName = file.name;
+      state.useUploadedImage = false;
+      $("#imageStatus").textContent = "已上传";
+      if (!controls.motionPrompt.value.trim()) {
+        controls.motionPrompt.value = "轻微呼吸，向右奔跑，带发光拖尾";
+      }
+      updateSummary();
+    });
+    image.src = reader.result;
+  });
+  reader.readAsDataURL(file);
+});
+
+$("#applyImageMotion").addEventListener("click", () => {
+  if (!state.uploadedImage) {
+    $("#imageStatus").textContent = "请先上传";
+    return;
+  }
+  state.useUploadedImage = true;
+  state.seed = hashText(`${state.uploadedName}|${controls.motionPrompt.value}|${Date.now()}`) % 10000000;
+  $("#imageStatus").textContent = "动作化中";
+  generate();
+  $("#imageStatus").textContent = "已应用";
+});
+
+$("#clearImageMotion").addEventListener("click", () => {
+  state.useUploadedImage = false;
+  $("#imageStatus").textContent = state.uploadedImage ? "已上传" : "未上传";
+  generate();
+});
 
 document.querySelectorAll("[data-example]").forEach((button) => {
   button.addEventListener("click", () => {
@@ -680,6 +977,12 @@ $("#downloadPng").addEventListener("click", () => downloadCanvas(state.frames[0]
 $("#downloadSheet").addEventListener("click", () => downloadCanvas(sheet, `spriteforge_${state.seed}_sheet.png`));
 $("#downloadMeta").addEventListener("click", downloadJson);
 
+const session = readStorage(storageKeys.session, null);
+if (session?.user) {
+  state.user = session.user;
+}
+setAuthMode("login");
+renderAuth();
 updatePalette();
 generate();
 renderAssetPack();

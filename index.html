@@ -17,6 +17,24 @@
           </div>
         </div>
 
+        <section class="auth-panel" id="authPanel">
+          <div class="row-title">
+            <span>账号</span>
+            <span id="authStatus">未登录</span>
+          </div>
+          <div class="auth-tabs">
+            <button id="loginTab" class="auth-tab active" type="button">登录</button>
+            <button id="registerTab" class="auth-tab" type="button">注册</button>
+          </div>
+          <div class="auth-form">
+            <input id="authName" type="text" maxlength="18" autocomplete="username" placeholder="用户名">
+            <input id="authPassword" type="password" maxlength="24" autocomplete="current-password" placeholder="密码">
+            <button id="authSubmit" class="primary compact" type="button">登录</button>
+            <button id="logout" class="secondary compact hidden" type="button">退出登录</button>
+            <p id="authMessage"></p>
+          </div>
+        </section>
+
         <section class="panel-block">
           <label for="prompt">素材描述</label>
           <textarea id="prompt" rows="4">赛博武士，蓝色能量刀，适合横版动作游戏</textarea>
@@ -84,6 +102,23 @@
           <button id="generate" class="primary">生成素材</button>
           <button id="generatePack" class="secondary">生成同风格资产包</button>
         </section>
+
+        <section class="panel-block upload-lab">
+          <div class="row-title">
+            <span>上传图片动作化</span>
+            <span id="imageStatus">未上传</span>
+          </div>
+          <label class="upload-drop" for="imageUpload">
+            <input id="imageUpload" type="file" accept="image/png,image/jpeg,image/webp">
+            <span>选择 PNG / JPG / WebP</span>
+          </label>
+          <label for="motionPrompt">动作或变化描述</label>
+          <textarea id="motionPrompt" rows="3" placeholder="例如：向右奔跑并挥剑，带蓝色雷电拖尾"></textarea>
+          <div class="motion-actions">
+            <button id="applyImageMotion" class="primary compact" type="button">应用到上传图</button>
+            <button id="clearImageMotion" class="secondary compact" type="button">回到程序生成</button>
+          </div>
+        </section>
       </aside>
 
       <section class="workspace">
@@ -116,6 +151,10 @@
             <div>
               <span class="metric" id="pipelineMetric">Unity/Godot</span>
               <span>工作流</span>
+            </div>
+            <div>
+              <span class="metric" id="sourceMetric">文本</span>
+              <span>素材来源</span>
             </div>
           </div>
         </div>
