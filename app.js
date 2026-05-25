@@ -313,6 +313,561 @@ function mirrorPixels(ctx, pixels, unit, cells) {
   });
 }
 
+function ellipse(ctx, x, y, w, h, color, unit) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.ellipse((x + w / 2) * unit, (y + h / 2) * unit, (w / 2) * unit, (h / 2) * unit, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function strokeEllipse(ctx, x, y, w, h, color, unit, lineWidth = 1) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1, lineWidth * unit);
+  ctx.beginPath();
+  ctx.ellipse((x + w / 2) * unit, (y + h / 2) * unit, (w / 2) * unit, (h / 2) * unit, 0, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+function drawVectorFrame(ctx, frame, opt, type, size) {
+  const semantic = opt.semantic;
+  if (type === "character") {
+    if (semantic.cat) drawVectorCat(ctx, frame, opt, size);
+    else if (semantic.owl) drawVectorOwl(ctx, frame, opt, size);
+    else if (semantic.slime) drawVectorSlime(ctx, frame, opt, size);
+    else drawVectorHero(ctx, frame, opt, size);
+    return true;
+  }
+  if (type === "item") {
+    drawVectorItem(ctx, frame, opt, size);
+    return true;
+  }
+  if (type === "tile") {
+    drawVectorTile(ctx, frame, opt, size);
+    return true;
+  }
+  if (type === "icon") {
+    drawVectorIcon(ctx, frame, opt, size);
+    return true;
+  }
+  return false;
+}
+
+function makeGradient(ctx, x, y, r, colors) {
+  const gradient = ctx.createRadialGradient(x - r * 0.25, y - r * 0.35, r * 0.08, x, y, r);
+  colors.forEach(([stop, color]) => gradient.addColorStop(stop, color));
+  return gradient;
+}
+
+function drawVectorShape(ctx, path, fill, stroke, lineWidth = 4) {
+  ctx.save();
+  ctx.fillStyle = fill;
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = lineWidth;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.fill(path);
+  ctx.stroke(path);
+  ctx.restore();
+}
+
+function roundedRectPath(x, y, width, height, radius) {
+  const r = Math.min(radius, width / 2, height / 2);
+  const path = new Path2D();
+  path.moveTo(x + r, y);
+  path.lineTo(x + width - r, y);
+  path.quadraticCurveTo(x + width, y, x + width, y + r);
+  path.lineTo(x + width, y + height - r);
+  path.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+  path.lineTo(x + r, y + height);
+  path.quadraticCurveTo(x, y + height, x, y + height - r);
+  path.lineTo(x, y + r);
+  path.quadraticCurveTo(x, y, x + r, y);
+  path.closePath();
+  return path;
+}
+
+function drawVectorCat(ctx, frame, opt, size) {
+  const { palette, semantic } = opt;
+  const bob = Math.sin(frame * 1.4) * size * 0.015;
+  const tail = Math.sin(frame * 1.2) * size * 0.045;
+  const outline = palette[0];
+  const body = makeGradient(ctx, size * 0.5, size * 0.5, size * 0.32, [[0, palette[4]], [0.2, palette[2]], [1, palette[1]]]);
+  const accent = semantic.purple ? "#a855f7" : palette[3];
+
+  ctx.save();
+  ctx.translate(0, bob);
+  ctx.shadowColor = "rgba(0,0,0,0.35)";
+  ctx.shadowBlur = size * 0.025;
+  ctx.shadowOffsetY = size * 0.018;
+
+  const tailPath = new Path2D();
+  tailPath.moveTo(size * 0.3, size * 0.62);
+  tailPath.bezierCurveTo(size * 0.09, size * 0.53 + tail, size * 0.18, size * 0.28 - tail, size * 0.35, size * 0.34);
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = size * 0.085;
+  ctx.lineCap = "round";
+  ctx.stroke(tailPath);
+  ctx.strokeStyle = palette[2];
+  ctx.lineWidth = size * 0.052;
+  ctx.stroke(tailPath);
+
+  const bodyPath = new Path2D();
+  bodyPath.ellipse(size * 0.5, size * 0.58, size * 0.21, size * 0.27, 0, 0, Math.PI * 2);
+  drawVectorShape(ctx, bodyPath, body, outline, size * 0.018);
+
+  const headPath = new Path2D();
+  headPath.moveTo(size * 0.31, size * 0.42);
+  headPath.quadraticCurveTo(size * 0.29, size * 0.26, size * 0.39, size * 0.29);
+  headPath.lineTo(size * 0.46, size * 0.2);
+  headPath.quadraticCurveTo(size * 0.5, size * 0.28, size * 0.54, size * 0.2);
+  headPath.lineTo(size * 0.61, size * 0.29);
+  headPath.quadraticCurveTo(size * 0.72, size * 0.26, size * 0.69, size * 0.43);
+  headPath.bezierCurveTo(size * 0.68, size * 0.56, size * 0.58, size * 0.64, size * 0.5, size * 0.64);
+  headPath.bezierCurveTo(size * 0.39, size * 0.64, size * 0.31, size * 0.55, size * 0.31, size * 0.42);
+  drawVectorShape(ctx, headPath, body, outline, size * 0.018);
+
+  ctx.fillStyle = palette[4];
+  ctx.beginPath();
+  ctx.ellipse(size * 0.43, size * 0.43, size * 0.042, size * 0.052, 0, 0, Math.PI * 2);
+  ctx.ellipse(size * 0.57, size * 0.43, size * 0.042, size * 0.052, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = outline;
+  ctx.beginPath();
+  ctx.ellipse(size * 0.435, size * 0.435, size * 0.012, size * 0.03, 0, 0, Math.PI * 2);
+  ctx.ellipse(size * 0.565, size * 0.435, size * 0.012, size * 0.03, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = size * 0.011;
+  ctx.beginPath();
+  ctx.moveTo(size * 0.5, size * 0.47);
+  ctx.quadraticCurveTo(size * 0.49, size * 0.5, size * 0.46, size * 0.51);
+  ctx.moveTo(size * 0.5, size * 0.47);
+  ctx.quadraticCurveTo(size * 0.51, size * 0.5, size * 0.54, size * 0.51);
+  ctx.stroke();
+  ctx.fillStyle = accent;
+  ctx.beginPath();
+  ctx.moveTo(size * 0.485, size * 0.465);
+  ctx.quadraticCurveTo(size * 0.5, size * 0.485, size * 0.515, size * 0.465);
+  ctx.quadraticCurveTo(size * 0.5, size * 0.452, size * 0.485, size * 0.465);
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(255,255,255,0.32)";
+  ctx.lineWidth = size * 0.011;
+  ctx.beginPath();
+  ctx.moveTo(size * 0.38, size * 0.36);
+  ctx.quadraticCurveTo(size * 0.5, size * 0.3, size * 0.62, size * 0.36);
+  ctx.stroke();
+
+  ctx.fillStyle = outline;
+  ctx.beginPath();
+  ctx.ellipse(size * 0.43, size * 0.83, size * 0.055, size * 0.026, 0, 0, Math.PI * 2);
+  ctx.ellipse(size * 0.57, size * 0.83, size * 0.055, size * 0.026, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  drawVectorEffects(ctx, frame, opt, size);
+}
+
+function drawVectorOwl(ctx, frame, opt, size) {
+  const { palette } = opt;
+  const flap = Math.sin(frame * 1.5) * size * 0.04;
+  const outline = palette[0];
+  const body = makeGradient(ctx, size * 0.5, size * 0.5, size * 0.32, [[0, palette[4]], [0.24, palette[2]], [1, palette[1]]]);
+
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.34)";
+  ctx.shadowBlur = size * 0.022;
+  const leftWing = new Path2D();
+  leftWing.moveTo(size * 0.38, size * 0.42);
+  leftWing.bezierCurveTo(size * 0.15, size * 0.38 + flap, size * 0.16, size * 0.67, size * 0.36, size * 0.72);
+  leftWing.quadraticCurveTo(size * 0.32, size * 0.56, size * 0.38, size * 0.42);
+  drawVectorShape(ctx, leftWing, palette[2], outline, size * 0.016);
+  const rightWing = new Path2D();
+  rightWing.moveTo(size * 0.62, size * 0.42);
+  rightWing.bezierCurveTo(size * 0.85, size * 0.38 - flap, size * 0.84, size * 0.67, size * 0.64, size * 0.72);
+  rightWing.quadraticCurveTo(size * 0.68, size * 0.56, size * 0.62, size * 0.42);
+  drawVectorShape(ctx, rightWing, palette[2], outline, size * 0.016);
+  const bodyPath = new Path2D();
+  bodyPath.moveTo(size * 0.34, size * 0.31);
+  bodyPath.bezierCurveTo(size * 0.34, size * 0.19, size * 0.45, size * 0.26, size * 0.5, size * 0.2);
+  bodyPath.bezierCurveTo(size * 0.55, size * 0.26, size * 0.66, size * 0.19, size * 0.66, size * 0.31);
+  bodyPath.bezierCurveTo(size * 0.76, size * 0.54, size * 0.67, size * 0.82, size * 0.5, size * 0.83);
+  bodyPath.bezierCurveTo(size * 0.33, size * 0.82, size * 0.24, size * 0.54, size * 0.34, size * 0.31);
+  drawVectorShape(ctx, bodyPath, body, outline, size * 0.018);
+  ctx.fillStyle = palette[4];
+  ctx.beginPath();
+  ctx.ellipse(size * 0.43, size * 0.42, size * 0.075, size * 0.085, 0, 0, Math.PI * 2);
+  ctx.ellipse(size * 0.57, size * 0.42, size * 0.075, size * 0.085, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = outline;
+  ctx.beginPath();
+  ctx.arc(size * 0.43, size * 0.42, size * 0.025, 0, Math.PI * 2);
+  ctx.arc(size * 0.57, size * 0.42, size * 0.025, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#f7b955";
+  ctx.beginPath();
+  ctx.moveTo(size * 0.5, size * 0.48);
+  ctx.lineTo(size * 0.46, size * 0.55);
+  ctx.lineTo(size * 0.54, size * 0.55);
+  ctx.fill();
+  ctx.restore();
+  drawVectorEffects(ctx, frame, opt, size);
+}
+
+function drawVectorSlime(ctx, frame, opt, size) {
+  const { palette } = opt;
+  const squash = Math.sin(frame * 1.7) * size * 0.025;
+  const outline = palette[0];
+  const body = makeGradient(ctx, size * 0.48, size * 0.48, size * 0.35, [[0, palette[4]], [0.28, palette[2]], [1, palette[1]]]);
+  const blob = new Path2D();
+  blob.moveTo(size * 0.2, size * 0.66 + squash);
+  blob.bezierCurveTo(size * 0.18, size * 0.47, size * 0.31, size * 0.28 - squash, size * 0.5, size * 0.28);
+  blob.bezierCurveTo(size * 0.71, size * 0.28 - squash, size * 0.84, size * 0.48, size * 0.8, size * 0.67 + squash);
+  blob.bezierCurveTo(size * 0.7, size * 0.82, size * 0.31, size * 0.82, size * 0.2, size * 0.66 + squash);
+  drawVectorShape(ctx, blob, body, outline, size * 0.018);
+  ctx.fillStyle = palette[4];
+  ctx.beginPath();
+  ctx.ellipse(size * 0.42, size * 0.55, size * 0.035, size * 0.045, 0, 0, Math.PI * 2);
+  ctx.ellipse(size * 0.59, size * 0.55, size * 0.035, size * 0.045, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = palette[3];
+  ctx.lineWidth = size * 0.014;
+  ctx.beginPath();
+  ctx.quadraticCurveTo(size * 0.45, size * 0.66, size * 0.53, size * 0.66);
+  ctx.stroke();
+  drawVectorEffects(ctx, frame, opt, size);
+}
+
+function drawVectorHero(ctx, frame, opt, size) {
+  const { palette, semantic } = opt;
+  const bob = Math.sin(frame * 1.35) * size * 0.014;
+  const outline = palette[0];
+  const armor = makeGradient(ctx, size * 0.5, size * 0.5, size * 0.32, [[0, palette[4]], [0.32, palette[2]], [1, palette[1]]]);
+  ctx.save();
+  ctx.translate(0, bob);
+  ctx.shadowColor = "rgba(0,0,0,0.36)";
+  ctx.shadowBlur = size * 0.02;
+  const cloak = new Path2D();
+  cloak.moveTo(size * 0.38, size * 0.36);
+  cloak.bezierCurveTo(size * 0.22, size * 0.5, size * 0.26, size * 0.78, size * 0.42, size * 0.86);
+  cloak.lineTo(size * 0.6, size * 0.86);
+  cloak.bezierCurveTo(size * 0.74, size * 0.74, size * 0.78, size * 0.51, size * 0.62, size * 0.36);
+  drawVectorShape(ctx, cloak, palette[1], outline, size * 0.017);
+  const head = new Path2D();
+  head.ellipse(size * 0.5, size * 0.32, size * 0.12, size * 0.14, 0, 0, Math.PI * 2);
+  drawVectorShape(ctx, head, armor, outline, size * 0.016);
+  const torso = roundedRectPath(size * 0.36, size * 0.46, size * 0.28, size * 0.28, size * 0.05);
+  drawVectorShape(ctx, torso, armor, outline, size * 0.016);
+  ctx.fillStyle = palette[4];
+  ctx.beginPath();
+  ctx.ellipse(size * 0.46, size * 0.31, size * 0.025, size * 0.032, 0, 0, Math.PI * 2);
+  ctx.ellipse(size * 0.55, size * 0.31, size * 0.025, size * 0.032, 0, 0, Math.PI * 2);
+  ctx.fill();
+  if (semantic.archer) {
+    ctx.strokeStyle = outline;
+    ctx.lineWidth = size * 0.018;
+    ctx.beginPath();
+    ctx.arc(size * 0.72, size * 0.5, size * 0.17, -1.2, 1.2);
+    ctx.stroke();
+  }
+  if (semantic.knight || semantic.mage || semantic.staff) {
+    ctx.strokeStyle = palette[3];
+    ctx.lineWidth = size * 0.027;
+    ctx.beginPath();
+    ctx.moveTo(size * 0.68, size * 0.25);
+    ctx.quadraticCurveTo(size * 0.78, size * 0.45, size * 0.69, size * 0.74);
+    ctx.stroke();
+  }
+  ctx.restore();
+  drawVectorEffects(ctx, frame, opt, size);
+}
+
+function drawVectorItem(ctx, frame, opt, size) {
+  const { palette, semantic } = opt;
+  const bob = Math.sin(frame * 1.2) * size * 0.018;
+  const outline = palette[0];
+  ctx.save();
+  ctx.translate(0, bob);
+  if (semantic.chest) {
+    const lid = roundedRectPath(size * 0.24, size * 0.28, size * 0.52, size * 0.22, size * 0.06);
+    drawVectorShape(ctx, lid, palette[2], outline, size * 0.017);
+    const box = roundedRectPath(size * 0.21, size * 0.45, size * 0.58, size * 0.3, size * 0.04);
+    drawVectorShape(ctx, box, palette[1], outline, size * 0.017);
+    ctx.fillStyle = palette[4];
+    ctx.fillRect(size * 0.47, size * 0.43, size * 0.06, size * 0.22);
+  } else {
+    const gem = new Path2D();
+    gem.moveTo(size * 0.5, size * 0.17);
+    gem.lineTo(size * 0.73, size * 0.36);
+    gem.quadraticCurveTo(size * 0.67, size * 0.7, size * 0.5, size * 0.83);
+    gem.quadraticCurveTo(size * 0.33, size * 0.7, size * 0.27, size * 0.36);
+    gem.closePath();
+    drawVectorShape(ctx, gem, makeGradient(ctx, size * 0.45, size * 0.35, size * 0.28, [[0, palette[4]], [0.35, palette[2]], [1, palette[1]]]), outline, size * 0.017);
+  }
+  ctx.restore();
+  drawVectorEffects(ctx, frame, opt, size);
+}
+
+function drawVectorTile(ctx, frame, opt, size) {
+  const { palette, rand } = opt;
+  const grd = ctx.createLinearGradient(0, 0, size, size);
+  grd.addColorStop(0, palette[2]);
+  grd.addColorStop(0.5, palette[1]);
+  grd.addColorStop(1, palette[0]);
+  ctx.fillStyle = grd;
+  ctx.fillRect(size * 0.12, size * 0.18, size * 0.76, size * 0.64);
+  ctx.strokeStyle = palette[0];
+  ctx.lineWidth = size * 0.025;
+  ctx.strokeRect(size * 0.12, size * 0.18, size * 0.76, size * 0.64);
+  ctx.globalAlpha = 0.35;
+  for (let i = 0; i < 22; i += 1) {
+    ctx.fillStyle = i % 2 ? palette[4] : palette[3];
+    ctx.beginPath();
+    ctx.ellipse(size * (0.17 + rand() * 0.66), size * (0.24 + rand() * 0.52), size * (0.015 + rand() * 0.035), size * 0.012, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawVectorIcon(ctx, frame, opt, size) {
+  const { palette, semantic } = opt;
+  const pulse = 1 + Math.sin(frame * 1.4) * 0.05;
+  ctx.save();
+  ctx.translate(size * 0.5, size * 0.5);
+  ctx.scale(pulse, pulse);
+  ctx.fillStyle = makeGradient(ctx, 0, 0, size * 0.34, [[0, palette[4]], [0.35, palette[2]], [1, palette[1]]]);
+  ctx.strokeStyle = palette[0];
+  ctx.lineWidth = size * 0.022;
+  ctx.beginPath();
+  ctx.arc(0, 0, size * 0.31, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = semantic.thunder ? "#facc15" : semantic.fire ? "#fb923c" : semantic.ice ? "#bae6fd" : palette[4];
+  ctx.lineWidth = size * 0.05;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-size * 0.12, -size * 0.08);
+  ctx.quadraticCurveTo(0, -size * 0.25, size * 0.13, -size * 0.06);
+  ctx.quadraticCurveTo(size * 0.02, size * 0.08, size * 0.1, size * 0.2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawVectorEffects(ctx, frame, opt, size) {
+  const { semantic, palette, rand } = opt;
+  let color = null;
+  if (semantic.fire) color = "#fb923c";
+  if (semantic.ice) color = "#bae6fd";
+  if (semantic.thunder) color = "#facc15";
+  if (semantic.dark || semantic.purple) color = "#a855f7";
+  if (!color) return;
+  ctx.save();
+  ctx.globalAlpha = 0.72;
+  ctx.fillStyle = color;
+  for (let i = 0; i < 18; i += 1) {
+    const angle = rand() * Math.PI * 2 + frame * 0.1;
+    const radius = size * (0.2 + rand() * 0.25);
+    ctx.beginPath();
+    ctx.arc(size * 0.5 + Math.cos(angle) * radius, size * 0.52 + Math.sin(angle) * radius, size * (0.008 + rand() * 0.012), 0, Math.PI * 2);
+    ctx.fillStyle = rand() > 0.45 ? color : palette[4];
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawRefinedPixelFrame(ctx, frame, opt, type) {
+  if (type === "character") {
+    drawRefinedPixelCharacter(ctx, frame, opt);
+    return true;
+  }
+  if (type === "item") {
+    drawRefinedPixelItem(ctx, frame, opt);
+    return true;
+  }
+  if (type === "tile") {
+    drawRefinedPixelTile(ctx, frame, opt);
+    return true;
+  }
+  if (type === "icon") {
+    drawRefinedPixelIcon(ctx, frame, opt);
+    return true;
+  }
+  return false;
+}
+
+function drawRefinedPixelCharacter(ctx, frame, opt) {
+  const unit = opt.unit;
+  const { palette, semantic, rand } = opt;
+  const outline = palette[0];
+  const body = palette[1];
+  const mid = palette[2];
+  const accent = palette[3];
+  const light = palette[4];
+  const bob = Math.sin(frame * 1.35) * 0.8;
+  const wing = Math.sin(frame * 1.4) * 1.6;
+
+  if (semantic.owl) {
+    rect(ctx, 13, 14 + bob, 22, 24, outline, unit);
+    rect(ctx, 15, 13 + bob, 18, 25, body, unit);
+    rect(ctx, 11, 18 + bob + wing, 7, 15, outline, unit);
+    rect(ctx, 30, 18 + bob - wing, 7, 15, outline, unit);
+    rect(ctx, 12, 19 + bob + wing, 6, 13, mid, unit);
+    rect(ctx, 30, 19 + bob - wing, 6, 13, mid, unit);
+    rect(ctx, 14, 9 + bob, 7, 8, outline, unit);
+    rect(ctx, 27, 9 + bob, 7, 8, outline, unit);
+    rect(ctx, 16, 11 + bob, 5, 6, body, unit);
+    rect(ctx, 27, 11 + bob, 5, 6, body, unit);
+    rect(ctx, 16, 18 + bob, 7, 7, light, unit);
+    rect(ctx, 25, 18 + bob, 7, 7, light, unit);
+    rect(ctx, 18, 20 + bob, 3, 3, outline, unit);
+    rect(ctx, 27, 20 + bob, 3, 3, outline, unit);
+    rect(ctx, 21, 25 + bob, 6, 4, accent, unit);
+    rect(ctx, 22, 29 + bob, 4, 3, "#f7b955", unit);
+    rect(ctx, 18, 33 + bob, 12, 3, mid, unit);
+    rect(ctx, 17, 39 + bob, 4, 3, accent, unit);
+    rect(ctx, 27, 39 + bob, 4, 3, accent, unit);
+  } else if (semantic.cat) {
+    rect(ctx, 14, 13 + bob, 20, 23, outline, unit);
+    rect(ctx, 16, 14 + bob, 16, 21, body, unit);
+    rect(ctx, 14, 8 + bob, 7, 8, outline, unit);
+    rect(ctx, 27, 8 + bob, 7, 8, outline, unit);
+    rect(ctx, 16, 10 + bob, 4, 5, mid, unit);
+    rect(ctx, 28, 10 + bob, 4, 5, mid, unit);
+    rect(ctx, 18, 20 + bob, 4, 3, light, unit);
+    rect(ctx, 26, 20 + bob, 4, 3, light, unit);
+    rect(ctx, 20, 24 + bob, 8, 3, accent, unit);
+    rect(ctx, 9, 28 + bob, 6, 4, outline, unit);
+    rect(ctx, 7, 24 + bob + Math.sin(frame) * 2, 4, 10, mid, unit);
+    rect(ctx, 17, 35 + bob, 5, 6, outline, unit);
+    rect(ctx, 26, 35 + bob, 5, 6, outline, unit);
+  } else if (semantic.slime) {
+    rect(ctx, 12, 24 + bob, 24, 12, outline, unit);
+    rect(ctx, 14, 18 + bob, 20, 17, body, unit);
+    rect(ctx, 18, 16 + bob, 12, 5, mid, unit);
+    rect(ctx, 18, 25 + bob, 4, 3, light, unit);
+    rect(ctx, 27, 25 + bob, 4, 3, outline, unit);
+    rect(ctx, 19, 32 + bob, 10, 2, accent, unit);
+    rect(ctx, 11, 36 + bob, 26, 3, accent, unit);
+  } else {
+    rect(ctx, 16, 7 + bob, 16, 5, outline, unit);
+    rect(ctx, 14, 12 + bob, 20, 13, outline, unit);
+    rect(ctx, 16, 13 + bob, 16, 11, body, unit);
+    rect(ctx, 18, 16 + bob, 4, 4, light, unit);
+    rect(ctx, 26, 16 + bob, 4, 4, outline, unit);
+    rect(ctx, 20, 22 + bob, 8, 2, accent, unit);
+    rect(ctx, 13, 25 + bob, 22, 15, outline, unit);
+    rect(ctx, 15, 26 + bob, 18, 13, body, unit);
+    rect(ctx, 18, 27 + bob, 12, 4, mid, unit);
+    rect(ctx, 9, 27 + bob, 7, 12, outline, unit);
+    rect(ctx, 32, 27 + bob, 7, 12, outline, unit);
+    rect(ctx, 11, 28 + bob, 5, 10, mid, unit);
+    rect(ctx, 32, 28 + bob, 5, 10, mid, unit);
+    rect(ctx, 16, 40 + bob, 6, 6, outline, unit);
+    rect(ctx, 26, 40 + bob, 6, 6, outline, unit);
+  }
+
+  if (semantic.archer) {
+    rect(ctx, 37, 13 + bob, 2, 25, outline, unit);
+    rect(ctx, 38, 14 + bob, 2, 23, mid, unit);
+    rect(ctx, 26, 25 + bob, 13, 2, accent, unit);
+  }
+  if (semantic.mage || semantic.staff) {
+    rect(ctx, 39, 9 + bob, 3, 32, outline, unit);
+    rect(ctx, 37, 7 + bob, 7, 6, light, unit);
+    rect(ctx, 16, 5 + bob, 16, 5, accent, unit);
+  }
+  if (semantic.knight || semantic.mech) {
+    rect(ctx, 13, 12 + bob, 22, 3, light, unit);
+    rect(ctx, 17, 26 + bob, 14, 3, accent, unit);
+  }
+  if (semantic.plant) {
+    rect(ctx, 20, 4 + bob, 8, 6, "#65a30d", unit);
+    rect(ctx, 16, 8 + bob, 16, 5, "#bef264", unit);
+  }
+  drawElementAura(ctx, frame, { ...opt, unit }, 8, 7, 32, 34);
+  for (let i = 0; i < Math.min(18, 6 + opt.detail * 2); i += 1) {
+    rect(ctx, 11 + rand() * 26, 8 + rand() * 32, 1, 1, rand() > 0.5 ? light : accent, unit);
+  }
+}
+
+function drawRefinedPixelItem(ctx, frame, opt) {
+  const { unit, palette, semantic, rand } = opt;
+  const pulse = Math.sin(frame * 1.2) * 0.9;
+  const outline = palette[0];
+  const body = palette[1];
+  const mid = palette[2];
+  const accent = palette[3];
+  const light = palette[4];
+
+  if (semantic.chest) {
+    rect(ctx, 8, 19 + pulse, 32, 6, outline, unit);
+    rect(ctx, 10, 14 + pulse, 28, 8, mid, unit);
+    rect(ctx, 13, 11 + pulse, 22, 5, light, unit);
+    rect(ctx, 8, 24 + pulse, 32, 15, outline, unit);
+    rect(ctx, 10, 25 + pulse, 28, 12, body, unit);
+    rect(ctx, 10, 25 + pulse, 28, 3, accent, unit);
+    rect(ctx, 22, 23 + pulse, 5, 15, outline, unit);
+    rect(ctx, 23, 27 + pulse, 3, 5, light, unit);
+  } else {
+    rect(ctx, 15, 14 + pulse, 18, 20, outline, unit);
+    rect(ctx, 17, 12 + pulse, 14, 21, body, unit);
+    rect(ctx, 19, 9 + pulse, 10, 6, mid, unit);
+    rect(ctx, 20, 18 + pulse, 8, 8, accent, unit);
+    rect(ctx, 22, 20 + pulse, 4, 3, light, unit);
+  }
+
+  if (semantic.staff) {
+    rect(ctx, 23, 5 + pulse, 3, 36, outline, unit);
+    rect(ctx, 20, 4 + pulse, 9, 8, light, unit);
+  }
+  if (semantic.shield) {
+    rect(ctx, 13, 10 + pulse, 22, 27, outline, unit);
+    rect(ctx, 16, 13 + pulse, 16, 20, mid, unit);
+    rect(ctx, 20, 17 + pulse, 8, 10, light, unit);
+  }
+  drawElementAura(ctx, frame, opt, 8, 7, 32, 32);
+  for (let i = 0; i < 10 + opt.detail; i += 1) {
+    rect(ctx, 8 + rand() * 32, 7 + rand() * 32, 1, 1, rand() > 0.5 ? light : accent, unit);
+  }
+}
+
+function drawRefinedPixelTile(ctx, frame, opt) {
+  const { unit, palette, rand, detail } = opt;
+  rect(ctx, 0, 0, 48, 48, palette[0], unit);
+  rect(ctx, 0, 0, 48, 14, palette[2], unit);
+  rect(ctx, 0, 14, 48, 25, palette[1], unit);
+  rect(ctx, 0, 39, 48, 9, palette[0], unit);
+  for (let i = 0; i < 42 + detail * 3; i += 1) {
+    rect(ctx, Math.floor(rand() * 48), Math.floor(rand() * 48), 1 + Math.floor(rand() * 4), 1, palette[i % palette.length], unit);
+  }
+  rect(ctx, (frame * 4) % 44, 8, 4, 1, palette[4], unit);
+  rect(ctx, 7, 14, 34, 2, palette[4], unit);
+}
+
+function drawRefinedPixelIcon(ctx, frame, opt) {
+  const { unit, palette, semantic } = opt;
+  const pulse = Math.sin(frame * 1.2) * 1.2;
+  rect(ctx, 9, 9, 30, 30, palette[0], unit);
+  rect(ctx, 11, 11, 26, 26, palette[1], unit);
+  rect(ctx, 13, 13, 22, 22, palette[2], unit);
+  if (semantic.thunder) {
+    rect(ctx, 24, 12 + pulse, 6, 13, palette[4], unit);
+    rect(ctx, 18, 24 + pulse, 12, 4, palette[4], unit);
+    rect(ctx, 18, 28 + pulse, 6, 12, palette[3], unit);
+  } else if (semantic.fire) {
+    rect(ctx, 20, 12 + pulse, 8, 22, palette[3], unit);
+    rect(ctx, 23, 17 + pulse, 4, 14, palette[4], unit);
+  } else if (semantic.ice) {
+    rect(ctx, 23, 10, 3, 28, palette[4], unit);
+    rect(ctx, 10, 23, 28, 3, palette[4], unit);
+    rect(ctx, 16, 16, 16, 16, palette[2], unit);
+  } else {
+    rect(ctx, 21, 13 + pulse, 7, 22, palette[4], unit);
+    rect(ctx, 13, 21 + pulse, 22, 7, palette[4], unit);
+  }
+}
+
 function drawCharacter(ctx, frame, opt) {
   if (opt.semantic.dark && opt.semantic.knight) {
     drawDarkKnight(ctx, frame, opt);
@@ -844,7 +1399,7 @@ function drawFrame(target, frameIndex, size) {
   const rand = rng(seed);
   const semantic = analyzePrompt(controls.prompt.value);
   const palette = derivePalette(state.palette, semantic);
-  const cells = 32;
+  const cells = 48;
   const unit = size / cells;
   ctx.clearRect(0, 0, size, size);
   ctx.imageSmoothingEnabled = controls.stylePreset.value !== "pixel";
@@ -860,10 +1415,14 @@ function drawFrame(target, frameIndex, size) {
   };
 
   const type = controls.assetType.value;
-  if (type === "character") drawCharacter(ctx, frameIndex, opt);
-  if (type === "item") drawItem(ctx, frameIndex, opt);
-  if (type === "tile") drawTile(ctx, frameIndex, opt);
-  if (type === "icon") drawIcon(ctx, frameIndex, opt);
+  const usePixelRenderer = controls.stylePreset.value === "pixel";
+  const rendered = usePixelRenderer
+    ? drawRefinedPixelFrame(ctx, frameIndex, opt, type)
+    : drawVectorFrame(ctx, frameIndex, opt, type, size);
+  if (!rendered && type === "character") drawCharacter(ctx, frameIndex, opt);
+  if (!rendered && type === "item") drawItem(ctx, frameIndex, opt);
+  if (!rendered && type === "tile") drawTile(ctx, frameIndex, opt);
+  if (!rendered && type === "icon") drawIcon(ctx, frameIndex, opt);
 
   if (controls.stylePreset.value === "handpaint") {
     ctx.globalAlpha = 0.14;
