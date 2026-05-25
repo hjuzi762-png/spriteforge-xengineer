@@ -32,6 +32,7 @@ function semanticParse(prompt, assetType = "character") {
     tesla: has(text, ["特斯拉", "tesla", "model 3", "model y", "model s", "cybertruck"]),
     spaceship: has(text, ["飞船", "宇宙飞船", "战机", "spaceship", "fighter", "starship"]),
     building: has(text, ["建筑", "房子", "城堡", "塔", "屋", "building", "house", "castle", "tower"]),
+    character: has(text, ["人", "人物", "角色", "武士", "骑士", "剑士", "法师", "弓箭手", "warrior", "samurai", "knight", "mage", "character", "hero"]),
     potion: has(text, ["药水", "瓶子", "potion", "bottle"]),
     weapon: has(text, ["剑", "刀", "枪", "武器", "sword", "blade", "weapon", "gun"]),
     chest: has(text, ["宝箱", "箱子", "chest", "treasure"]),
@@ -54,7 +55,9 @@ function semanticParse(prompt, assetType = "character") {
     thunder: has(text, ["雷", "电", "lightning", "thunder"]),
   };
 
+  const characterIntent = assetType === "character" || semantic.character;
   const subject =
+    characterIntent ? "character" :
     semantic.tesla ? "tesla" :
     semantic.vehicle ? "vehicle" :
     semantic.dog ? "dog" :
@@ -78,11 +81,14 @@ function sendJson(res, status, payload) {
 function buildImagePrompt(payload) {
   const parsed = semanticParse(payload.prompt, payload.assetType);
   const subject = parsed.subject;
+  const characterIntent = subject === "character" || payload.assetType === "character";
   const styleName = payload.style === "pixel" ? "crisp pixel art" : payload.style === "neon" ? "neon sci-fi game art" : payload.style === "ink" ? "ink wash game concept art" : "polished 2D game asset";
   const colorHints = Array.isArray(payload.palette) ? payload.palette.join(", ") : "";
   return [
     `Create a ${styleName} for a 2D game.`,
     `Subject: ${payload.prompt}. Interpreted subject category: ${subject}.`,
+    characterIntent ? "If the prompt mentions a weapon, draw the full character holding or using that weapon; do not generate the weapon alone." : "",
+    characterIntent ? "The full person/creature must be visible: head, torso, arms, legs, costume, and equipment." : "",
     "Make the object/person highly recognizable and centered.",
     "Use a transparent or plain clean background. Do not include text, watermark, UI, frame, or mockup.",
     "Single isolated game asset, full body/object visible, readable silhouette, strong details, production-quality shape language.",

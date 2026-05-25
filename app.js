@@ -378,19 +378,20 @@ function strokeEllipse(ctx, x, y, w, h, color, unit, lineWidth = 1) {
 
 function drawVectorFrame(ctx, frame, opt, type, size) {
   const semantic = opt.semantic;
-  if (semantic.tesla || semantic.vehicle) {
+  const characterIntent = type === "character" || semantic.knight || semantic.mage || semantic.archer || semantic.merchant;
+  if (!characterIntent && (semantic.tesla || semantic.vehicle)) {
     drawVectorVehicle(ctx, frame, opt, size);
     return true;
   }
-  if (semantic.spaceship) {
+  if (!characterIntent && semantic.spaceship) {
     drawVectorSpaceship(ctx, frame, opt, size);
     return true;
   }
-  if (semantic.building) {
+  if (!characterIntent && semantic.building) {
     drawVectorBuilding(ctx, frame, opt, size);
     return true;
   }
-  if (semantic.potion || semantic.weapon) {
+  if (!characterIntent && (semantic.potion || semantic.weapon)) {
     drawVectorItem(ctx, frame, opt, size);
     return true;
   }
@@ -711,6 +712,14 @@ function drawVectorHero(ctx, frame, opt, size) {
     ctx.moveTo(size * 0.68, size * 0.25);
     ctx.quadraticCurveTo(size * 0.78, size * 0.45, size * 0.69, size * 0.74);
     ctx.stroke();
+    if (semantic.weapon || semantic.knight) {
+      ctx.strokeStyle = palette[4];
+      ctx.lineWidth = size * 0.012;
+      ctx.beginPath();
+      ctx.moveTo(size * 0.7, size * 0.27);
+      ctx.quadraticCurveTo(size * 0.79, size * 0.45, size * 0.7, size * 0.72);
+      ctx.stroke();
+    }
   }
   ctx.restore();
   drawVectorEffects(ctx, frame, opt, size);
