@@ -229,13 +229,20 @@ function analyzePrompt(prompt) {
     archer: has("弓", "弓箭", "archer", "bow"),
     shield: has("盾", "shield"),
     staff: has("法杖", "权杖", "staff", "wand"),
-    cat: has("猫", "cat"),
-    owl: has("猫头鹰", "owl"),
+    cat: has("猫", "猫咪", "小猫", "cat", "kitten"),
+    owl: has("猫头鹰", "猫头鷹", "夜枭", "鸮", "owl"),
     octopus: has("章鱼", "octopus"),
     mech: has("机械", "机甲", "robot", "mech", "machine"),
     plant: has("植物", "花", "树", "plant", "flower"),
     merchant: has("商人", "merchant", "shop"),
     slime: has("史莱姆", "slime"),
+    monochrome: has("黑白", "白黑", "black and white", "monochrome", "grayscale", "grey scale"),
+    black: has("黑", "黑色", "black"),
+    white: has("白", "白色", "white"),
+    gray: has("灰", "灰色", "银", "银色", "gray", "grey", "silver"),
+    pink: has("粉", "粉色", "pink"),
+    green: has("绿", "绿色", "green"),
+    orange: has("橙", "橙色", "orange"),
     purple: has("紫", "purple", "violet"),
     blue: has("蓝", "blue"),
     red: has("红", "red"),
@@ -250,6 +257,27 @@ function analyzePrompt(prompt) {
 }
 
 function derivePalette(basePalette, semantic) {
+  if (semantic.monochrome || (semantic.black && semantic.white)) {
+    return ["#0b0d10", "#2b3036", "#6b7280", "#d1d5db", "#ffffff"];
+  }
+  if (semantic.black) {
+    return ["#050608", "#111827", "#374151", "#9ca3af", "#f9fafb"];
+  }
+  if (semantic.white) {
+    return ["#1f2937", "#e5e7eb", "#f3f4f6", "#ffffff", "#94a3b8"];
+  }
+  if (semantic.gray) {
+    return ["#111827", "#4b5563", "#9ca3af", "#d1d5db", "#f8fafc"];
+  }
+  if (semantic.pink) {
+    return ["#2a0f1f", "#db2777", "#f472b6", "#f9a8d4", "#fff1f7"];
+  }
+  if (semantic.green) {
+    return ["#07150d", "#16a34a", "#65a30d", "#bbf7d0", "#f0fdf4"];
+  }
+  if (semantic.orange) {
+    return ["#1c0f08", "#ea580c", "#fb923c", "#fed7aa", "#fff7ed"];
+  }
   if (semantic.dark && semantic.purple) {
     return ["#090713", "#1b102b", "#5b21b6", "#a855f7", "#f5d0fe"];
   }
@@ -1599,6 +1627,7 @@ function downloadCanvas(canvas, filename) {
 }
 
 function downloadJson() {
+  const semantic = analyzePrompt(`${controls.prompt.value} ${controls.motionPrompt.value}`);
   const payload = {
     name: `spriteforge_${state.seed}`,
     prompt: controls.prompt.value,
@@ -1611,6 +1640,10 @@ function downloadJson() {
     source: state.useUploadedImage ? "uploaded-image" : "procedural-text",
     uploadedImageName: state.uploadedName,
     motionPrompt: controls.motionPrompt.value.trim(),
+    recognizedSemantic: {
+      color: semantic.monochrome ? "monochrome" : semantic.black ? "black" : semantic.white ? "white" : semantic.gray ? "gray" : semantic.pink ? "pink" : semantic.green ? "green" : semantic.orange ? "orange" : semantic.purple ? "purple" : semantic.blue ? "blue" : semantic.red ? "red" : semantic.gold ? "gold" : "palette",
+      subject: semantic.owl ? "owl" : semantic.cat ? "cat" : semantic.slime ? "slime" : semantic.chest ? "chest" : semantic.mech ? "mech" : controls.assetType.value,
+    },
     stylePack: packItems.map((item) => ({
       name: item.title,
       type: item.type,
