@@ -12,6 +12,7 @@ const state = {
   authChallenge: 0,
   authFailures: 0,
   lockUntil: 0,
+  serverSemantic: null,
   uploadedImage: null,
   uploadedName: "",
   uploadedSubjectBox: null,
@@ -231,11 +232,19 @@ function analyzePrompt(prompt) {
     staff: has("法杖", "权杖", "staff", "wand"),
     cat: has("猫", "猫咪", "小猫", "cat", "kitten"),
     owl: has("猫头鹰", "猫头鷹", "夜枭", "鸮", "owl"),
+    dog: has("狗", "小狗", "狗狗", "柴犬", "柯基", "金毛", "哈士奇", "犬", "dog", "puppy", "corgi", "shiba", "husky"),
+    bird: has("鸟", "小鸟", "鹰", "隼", "bird", "eagle", "falcon"),
     octopus: has("章鱼", "octopus"),
     mech: has("机械", "机甲", "robot", "mech", "machine"),
     plant: has("植物", "花", "树", "plant", "flower"),
     merchant: has("商人", "merchant", "shop"),
     slime: has("史莱姆", "slime"),
+    vehicle: has("车", "汽车", "跑车", "轿车", "车辆", "car", "vehicle", "sedan", "suv"),
+    tesla: has("特斯拉", "tesla", "model 3", "model y", "model s", "cybertruck"),
+    spaceship: has("飞船", "宇宙飞船", "战机", "spaceship", "fighter", "starship"),
+    building: has("建筑", "房子", "城堡", "塔", "屋", "building", "house", "castle", "tower"),
+    potion: has("药水", "瓶子", "potion", "bottle"),
+    weapon: has("剑", "刀", "枪", "武器", "sword", "blade", "weapon", "gun"),
     monochrome: has("黑白", "白黑", "black and white", "monochrome", "grayscale", "grey scale"),
     black: has("黑", "黑色", "black"),
     white: has("白", "白色", "white"),
@@ -253,6 +262,13 @@ function analyzePrompt(prompt) {
     forest: has("森林", "forest", "green", "自然"),
     cyber: has("赛博", "cyber", "neon", "科幻"),
     steampunk: has("蒸汽朋克", "steampunk"),
+  };
+}
+
+function getSemantic(prompt) {
+  return {
+    ...analyzePrompt(prompt),
+    ...(state.serverSemantic ?? {}),
   };
 }
 
@@ -358,9 +374,26 @@ function strokeEllipse(ctx, x, y, w, h, color, unit, lineWidth = 1) {
 
 function drawVectorFrame(ctx, frame, opt, type, size) {
   const semantic = opt.semantic;
+  if (semantic.tesla || semantic.vehicle) {
+    drawVectorVehicle(ctx, frame, opt, size);
+    return true;
+  }
+  if (semantic.spaceship) {
+    drawVectorSpaceship(ctx, frame, opt, size);
+    return true;
+  }
+  if (semantic.building) {
+    drawVectorBuilding(ctx, frame, opt, size);
+    return true;
+  }
+  if (semantic.potion || semantic.weapon) {
+    drawVectorItem(ctx, frame, opt, size);
+    return true;
+  }
   if (type === "character") {
     if (semantic.cat) drawVectorCat(ctx, frame, opt, size);
     else if (semantic.owl) drawVectorOwl(ctx, frame, opt, size);
+    else if (semantic.dog) drawVectorDog(ctx, frame, opt, size);
     else if (semantic.slime) drawVectorSlime(ctx, frame, opt, size);
     else drawVectorHero(ctx, frame, opt, size);
     return true;
@@ -543,6 +576,74 @@ function drawVectorOwl(ctx, frame, opt, size) {
   drawVectorEffects(ctx, frame, opt, size);
 }
 
+function drawVectorDog(ctx, frame, opt, size) {
+  const { palette, semantic } = opt;
+  const bob = Math.sin(frame * 1.35) * size * 0.012;
+  const wag = Math.sin(frame * 1.8) * size * 0.05;
+  const outline = palette[0];
+  const fur = semantic.white ? "#f5f5f0" : semantic.black ? "#22252b" : semantic.gold ? "#c98a2e" : palette[2];
+  const patch = semantic.black ? "#f5f5f0" : palette[1];
+
+  ctx.save();
+  ctx.translate(0, bob);
+  ctx.shadowColor = "rgba(0,0,0,0.34)";
+  ctx.shadowBlur = size * 0.022;
+
+  const tail = new Path2D();
+  tail.moveTo(size * 0.66, size * 0.61);
+  tail.bezierCurveTo(size * 0.84, size * 0.48 + wag, size * 0.82, size * 0.32 + wag, size * 0.68, size * 0.38);
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = size * 0.064;
+  ctx.lineCap = "round";
+  ctx.stroke(tail);
+  ctx.strokeStyle = fur;
+  ctx.lineWidth = size * 0.041;
+  ctx.stroke(tail);
+
+  const body = new Path2D();
+  body.ellipse(size * 0.5, size * 0.64, size * 0.24, size * 0.2, 0, 0, Math.PI * 2);
+  drawVectorShape(ctx, body, makeGradient(ctx, size * 0.45, size * 0.55, size * 0.28, [[0, palette[4]], [0.35, fur], [1, patch]]), outline, size * 0.017);
+
+  const head = new Path2D();
+  head.ellipse(size * 0.43, size * 0.4, size * 0.18, size * 0.15, -0.1, 0, Math.PI * 2);
+  drawVectorShape(ctx, head, fur, outline, size * 0.017);
+  const muzzle = new Path2D();
+  muzzle.ellipse(size * 0.36, size * 0.45, size * 0.085, size * 0.06, 0, 0, Math.PI * 2);
+  drawVectorShape(ctx, muzzle, palette[4], outline, size * 0.01);
+
+  const ear1 = new Path2D();
+  ear1.moveTo(size * 0.34, size * 0.31);
+  ear1.bezierCurveTo(size * 0.22, size * 0.2, size * 0.22, size * 0.43, size * 0.33, size * 0.48);
+  ear1.quadraticCurveTo(size * 0.4, size * 0.39, size * 0.34, size * 0.31);
+  drawVectorShape(ctx, ear1, patch, outline, size * 0.015);
+  const ear2 = new Path2D();
+  ear2.moveTo(size * 0.5, size * 0.29);
+  ear2.bezierCurveTo(size * 0.64, size * 0.2, size * 0.66, size * 0.45, size * 0.52, size * 0.48);
+  ear2.quadraticCurveTo(size * 0.55, size * 0.37, size * 0.5, size * 0.29);
+  drawVectorShape(ctx, ear2, patch, outline, size * 0.015);
+
+  ctx.fillStyle = outline;
+  ctx.beginPath();
+  ctx.arc(size * 0.39, size * 0.39, size * 0.018, 0, Math.PI * 2);
+  ctx.arc(size * 0.49, size * 0.39, size * 0.018, 0, Math.PI * 2);
+  ctx.arc(size * 0.33, size * 0.45, size * 0.017, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = size * 0.01;
+  ctx.beginPath();
+  ctx.moveTo(size * 0.35, size * 0.47);
+  ctx.quadraticCurveTo(size * 0.38, size * 0.51, size * 0.43, size * 0.49);
+  ctx.stroke();
+
+  ctx.fillStyle = outline;
+  ctx.beginPath();
+  ctx.ellipse(size * 0.38, size * 0.83, size * 0.06, size * 0.026, 0, 0, Math.PI * 2);
+  ctx.ellipse(size * 0.6, size * 0.83, size * 0.06, size * 0.026, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  drawVectorEffects(ctx, frame, opt, size);
+}
+
 function drawVectorSlime(ctx, frame, opt, size) {
   const { palette } = opt;
   const squash = Math.sin(frame * 1.7) * size * 0.025;
@@ -635,6 +736,123 @@ function drawVectorItem(ctx, frame, opt, size) {
   }
   ctx.restore();
   drawVectorEffects(ctx, frame, opt, size);
+}
+
+function drawVectorVehicle(ctx, frame, opt, size) {
+  const { palette, semantic } = opt;
+  const pulse = Math.sin(frame * 1.25) * size * 0.006;
+  const outline = palette[0];
+  const paint = semantic.tesla
+    ? (semantic.black ? "#121417" : semantic.white ? "#f8fafc" : semantic.red ? "#dc2626" : "#d7dde6")
+    : palette[1];
+  const glass = semantic.tesla ? "#7dd3fc" : palette[4];
+  const accent = semantic.tesla ? "#ef4444" : palette[3];
+
+  ctx.save();
+  ctx.translate(0, pulse);
+  ctx.shadowColor = "rgba(0,0,0,0.38)";
+  ctx.shadowBlur = size * 0.026;
+  ctx.shadowOffsetY = size * 0.018;
+
+  const body = new Path2D();
+  if (semantic.tesla) {
+    body.moveTo(size * 0.16, size * 0.6);
+    body.bezierCurveTo(size * 0.23, size * 0.43, size * 0.37, size * 0.36, size * 0.54, size * 0.37);
+    body.bezierCurveTo(size * 0.72, size * 0.38, size * 0.83, size * 0.48, size * 0.88, size * 0.6);
+    body.quadraticCurveTo(size * 0.83, size * 0.72, size * 0.7, size * 0.74);
+    body.lineTo(size * 0.28, size * 0.74);
+    body.quadraticCurveTo(size * 0.17, size * 0.72, size * 0.16, size * 0.6);
+  } else {
+    body.moveTo(size * 0.16, size * 0.61);
+    body.bezierCurveTo(size * 0.22, size * 0.48, size * 0.34, size * 0.42, size * 0.48, size * 0.43);
+    body.bezierCurveTo(size * 0.64, size * 0.43, size * 0.8, size * 0.5, size * 0.86, size * 0.62);
+    body.quadraticCurveTo(size * 0.81, size * 0.75, size * 0.66, size * 0.76);
+    body.lineTo(size * 0.3, size * 0.76);
+    body.quadraticCurveTo(size * 0.18, size * 0.74, size * 0.16, size * 0.61);
+  }
+  body.closePath();
+  drawVectorShape(ctx, body, makeGradient(ctx, size * 0.46, size * 0.47, size * 0.5, [[0, "#ffffff"], [0.2, paint], [1, palette[1]]]), outline, size * 0.018);
+
+  const roof = new Path2D();
+  roof.moveTo(size * 0.33, size * 0.54);
+  roof.bezierCurveTo(size * 0.42, size * 0.4, size * 0.58, size * 0.4, size * 0.68, size * 0.54);
+  roof.lineTo(size * 0.33, size * 0.54);
+  drawVectorShape(ctx, roof, glass, outline, size * 0.012);
+
+  ctx.strokeStyle = "rgba(255,255,255,0.62)";
+  ctx.lineWidth = size * 0.012;
+  ctx.beginPath();
+  ctx.moveTo(size * 0.25, size * 0.57);
+  ctx.bezierCurveTo(size * 0.42, size * 0.47, size * 0.64, size * 0.47, size * 0.8, size * 0.58);
+  ctx.stroke();
+
+  ctx.fillStyle = semantic.tesla ? accent : palette[3];
+  ctx.beginPath();
+  ctx.ellipse(size * 0.5, size * 0.59, size * 0.025, size * 0.01, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = outline;
+  ctx.beginPath();
+  ctx.arc(size * 0.32, size * 0.75, size * 0.075, 0, Math.PI * 2);
+  ctx.arc(size * 0.7, size * 0.75, size * 0.075, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#d1d5db";
+  ctx.beginPath();
+  ctx.arc(size * 0.32, size * 0.75, size * 0.039, 0, Math.PI * 2);
+  ctx.arc(size * 0.7, size * 0.75, size * 0.039, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#fef08a";
+  ctx.beginPath();
+  ctx.ellipse(size * 0.82, size * 0.63, size * 0.03, size * 0.018, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#ef4444";
+  ctx.beginPath();
+  ctx.ellipse(size * 0.18, size * 0.64, size * 0.024, size * 0.014, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawVectorSpaceship(ctx, frame, opt, size) {
+  const { palette } = opt;
+  const bob = Math.sin(frame * 1.4) * size * 0.018;
+  const outline = palette[0];
+  ctx.save();
+  ctx.translate(0, bob);
+  const hull = new Path2D();
+  hull.moveTo(size * 0.18, size * 0.56);
+  hull.bezierCurveTo(size * 0.34, size * 0.28, size * 0.66, size * 0.28, size * 0.84, size * 0.56);
+  hull.bezierCurveTo(size * 0.62, size * 0.68, size * 0.39, size * 0.68, size * 0.18, size * 0.56);
+  drawVectorShape(ctx, hull, makeGradient(ctx, size * 0.5, size * 0.42, size * 0.36, [[0, palette[4]], [0.36, palette[2]], [1, palette[1]]]), outline, size * 0.017);
+  ctx.fillStyle = palette[4];
+  ctx.beginPath();
+  ctx.ellipse(size * 0.51, size * 0.48, size * 0.09, size * 0.055, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#fb923c";
+  ctx.beginPath();
+  ctx.moveTo(size * 0.18, size * 0.56);
+  ctx.bezierCurveTo(size * 0.08, size * 0.5, size * 0.08, size * 0.62, size * 0.18, size * 0.56);
+  ctx.fill();
+  ctx.restore();
+  drawVectorEffects(ctx, frame, opt, size);
+}
+
+function drawVectorBuilding(ctx, frame, opt, size) {
+  const { palette, semantic } = opt;
+  const outline = palette[0];
+  ctx.save();
+  const base = roundedRectPath(size * 0.25, size * 0.32, size * 0.5, size * 0.48, size * 0.025);
+  drawVectorShape(ctx, base, makeGradient(ctx, size * 0.43, size * 0.34, size * 0.4, [[0, palette[4]], [0.28, palette[2]], [1, palette[1]]]), outline, size * 0.016);
+  if (semantic.castle) {
+    ctx.fillStyle = palette[2];
+  }
+  ctx.fillStyle = palette[4];
+  for (let row = 0; row < 3; row += 1) {
+    for (let col = 0; col < 3; col += 1) {
+      ctx.fillRect(size * (0.33 + col * 0.13), size * (0.41 + row * 0.1), size * 0.055, size * 0.045);
+    }
+  }
+  ctx.fillStyle = outline;
+  ctx.fillRect(size * 0.46, size * 0.68, size * 0.08, size * 0.12);
+  ctx.restore();
 }
 
 function drawVectorTile(ctx, frame, opt, size) {
@@ -1308,7 +1526,7 @@ function drawUploadedFrame(target, frameIndex, size) {
   const progress = frameIndex / frameCount;
   const phase = progress * Math.PI * 2;
   const motion = analyzeMotion(`${controls.motionPrompt.value} ${controls.prompt.value}`);
-  const semantic = analyzePrompt(`${controls.motionPrompt.value} ${controls.prompt.value}`);
+  const semantic = getSemantic(`${controls.motionPrompt.value} ${controls.prompt.value}`);
   const palette = derivePalette(state.palette, semantic);
   const wave = Math.sin(phase);
   const hop = motion.jump ? -Math.abs(wave) * size * 0.18 : 0;
@@ -1425,7 +1643,7 @@ function drawFrame(target, frameIndex, size) {
   const promptHash = hashText(`${controls.prompt.value}|${controls.assetType.value}|${controls.stylePreset.value}`);
   const seed = promptHash + state.seed + frameIndex * 97;
   const rand = rng(seed);
-  const semantic = analyzePrompt(controls.prompt.value);
+  const semantic = getSemantic(controls.prompt.value);
   const palette = derivePalette(state.palette, semantic);
   const cells = 48;
   const unit = size / cells;
@@ -1627,7 +1845,7 @@ function downloadCanvas(canvas, filename) {
 }
 
 function downloadJson() {
-  const semantic = analyzePrompt(`${controls.prompt.value} ${controls.motionPrompt.value}`);
+  const semantic = getSemantic(`${controls.prompt.value} ${controls.motionPrompt.value}`);
   const payload = {
     name: `spriteforge_${state.seed}`,
     prompt: controls.prompt.value,
@@ -1660,6 +1878,36 @@ function downloadJson() {
   link.href = URL.createObjectURL(blob);
   link.click();
   URL.revokeObjectURL(link.href);
+}
+
+async function syncBackendSemantic() {
+  state.serverSemantic = null;
+  try {
+    const response = await fetch("/api/semantic-parse", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: controls.prompt.value,
+        assetType: controls.assetType.value,
+        style: controls.stylePreset.value,
+      }),
+    });
+    if (!response.ok) return;
+    const payload = await response.json();
+    if (payload?.semantic) {
+      state.serverSemantic = payload.semantic;
+      $("#pipelineMetric").textContent = payload.engine === "local-semantic" ? "后端语义" : payload.engine;
+    }
+  } catch (error) {
+    $("#pipelineMetric").textContent = "本地规则";
+  }
+}
+
+async function generateWithBackend(seedFactory) {
+  await syncBackendSemantic();
+  state.seed = seedFactory();
+  generate();
+  renderAssetPack();
 }
 
 $("#loginTab").addEventListener("click", () => setAuthMode("login"));
@@ -1723,6 +1971,7 @@ document.querySelectorAll("[data-example]").forEach((button) => {
 
 Object.values(controls).forEach((control) => {
   control.addEventListener("input", () => {
+    state.serverSemantic = null;
     generate();
     renderAssetPack();
   });
@@ -1737,15 +1986,11 @@ $("#randomPalette").addEventListener("click", () => {
 });
 
 $("#generate").addEventListener("click", () => {
-  state.seed = hashText(`${controls.prompt.value}${Date.now()}`) % 10000000;
-  generate();
-  renderAssetPack();
+  generateWithBackend(() => hashText(`${controls.prompt.value}${Date.now()}`) % 10000000);
 });
 
 $("#generatePack").addEventListener("click", () => {
-  state.seed = hashText(`pack|${controls.prompt.value}|${Date.now()}`) % 10000000;
-  generate();
-  renderAssetPack();
+  generateWithBackend(() => hashText(`pack|${controls.prompt.value}|${Date.now()}`) % 10000000);
 });
 
 $("#toggleGrid").addEventListener("click", () => {
