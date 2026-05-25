@@ -13,6 +13,7 @@ const state = {
   authFailures: 0,
   lockUntil: 0,
   serverSemantic: null,
+  generatedByAi: false,
   uploadedImage: null,
   uploadedName: "",
   uploadedSubjectBox: null,
@@ -1752,6 +1753,7 @@ function generate() {
   }
 
   state.activeFrame = 0;
+  state.generatedByAi = false;
   renderPreview();
   drawSheet();
   renderManifest();
@@ -1830,11 +1832,11 @@ function renderAssetPack() {
 function updateSummary() {
   const typeName = controls.assetType.options[controls.assetType.selectedIndex].text;
   const styleName = controls.stylePreset.options[controls.stylePreset.selectedIndex].text;
-  const source = state.useUploadedImage ? "上传图片动作化" : typeName;
+  const source = state.generatedByAi ? "AI 模型生成" : state.useUploadedImage ? "上传图片动作化" : typeName;
   $("#summary").textContent = `${source} · ${styleName} · ${controls.frames.value} 帧 · ${controls.size.value}px`;
   $("#frameMetric").textContent = controls.frames.value;
   $("#seedLabel").textContent = `Seed ${state.seed}`;
-  $("#sourceMetric").textContent = state.useUploadedImage ? "图片" : "文本";
+  $("#sourceMetric").textContent = state.generatedByAi ? "AI" : state.useUploadedImage ? "图片" : "文本";
 }
 
 function downloadCanvas(canvas, filename) {
@@ -1855,12 +1857,12 @@ function downloadJson() {
     frames: Number(controls.frames.value),
     palette: state.palette,
     author: state.user ?? "guest",
-    source: state.useUploadedImage ? "uploaded-image" : "procedural-text",
+    source: state.generatedByAi ? "ai-image-model" : state.useUploadedImage ? "uploaded-image" : "procedural-text",
     uploadedImageName: state.uploadedName,
     motionPrompt: controls.motionPrompt.value.trim(),
     recognizedSemantic: {
       color: semantic.monochrome ? "monochrome" : semantic.black ? "black" : semantic.white ? "white" : semantic.gray ? "gray" : semantic.pink ? "pink" : semantic.green ? "green" : semantic.orange ? "orange" : semantic.purple ? "purple" : semantic.blue ? "blue" : semantic.red ? "red" : semantic.gold ? "gold" : "palette",
-      subject: semantic.owl ? "owl" : semantic.cat ? "cat" : semantic.slime ? "slime" : semantic.chest ? "chest" : semantic.mech ? "mech" : controls.assetType.value,
+      subject: semantic.tesla ? "tesla" : semantic.vehicle ? "vehicle" : semantic.dog ? "dog" : semantic.owl ? "owl" : semantic.cat ? "cat" : semantic.slime ? "slime" : semantic.chest ? "chest" : semantic.mech ? "mech" : controls.assetType.value,
     },
     stylePack: packItems.map((item) => ({
       name: item.title,
@@ -1878,6 +1880,90 @@ function downloadJson() {
   link.href = URL.createObjectURL(blob);
   link.click();
   URL.revokeObjectURL(link.href);
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener("load", () => resolve(image));
+    image.addEventListener("error", () => reject(new Error("图片加载失败")));
+    image.src = src;
+  });
+}
+
+async function renderAiImageToFrames(imageDataUrl) {
+  const image = await loadImage(imageDataUrl);
+  const size = Number(controls.size.value);
+  const frameCount = Number(controls.frames.value);
+  const motion = analyzeMotion(`${controls.motionPrompt.value} ${controls.prompt.value}`);
+  state.frames = [];
+  preview.width = 768;
+  preview.height = 768;
+
+  for (let i = 0; i < frameCount; i += 1) {
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    const phase = (Math.PI * 2 * i) / Math.max(1, frameCount);
+    const hop = motion.jump ? -Math.abs(Math.sin(phase)) * size * 0.08 : 0;
+    const sway = motion.run ? Math.sin(phase) * size * 0.035 : 0;
+    const angle = motion.rotate ? phase : motion.attack ? Math.sin(phase) * 0.08 : 0;
+    const scale = 0.9 + (motion.grow ? Math.abs(Math.sin(phase)) * 0.08 : 0);
+    ctx.clearRect(0, 0, size, size);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.save();
+    ctx.translate(size / 2 + sway, size / 2 + hop);
+    ctx.rotate(angle);
+    ctx.scale(scale, scale);
+    const ratio = Math.min((size * 0.9) / image.width, (size * 0.9) / image.height);
+    const w = image.width * ratio;
+    const h = image.height * ratio;
+    ctx.drawImage(image, -w / 2, -h / 2, w, h);
+    ctx.restore();
+    state.frames.push(canvas);
+  }
+
+  state.generatedByAi = true;
+  state.useUploadedImage = false;
+  renderPreview();
+  drawSheet();
+  renderManifest();
+  updateSummary();
+  renderAssetPack();
+}
+
+async function generateWithImageModel() {
+  $("#aiStatus").textContent = "正在调用图像生成模型...";
+  $("#generateAi").disabled = true;
+  try {
+    await syncBackendSemantic();
+    const response = await fetch("/api/generate-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: controls.prompt.value,
+        assetType: controls.assetType.value,
+        style: controls.stylePreset.value,
+        size: Number(controls.size.value),
+        frames: Number(controls.frames.value),
+        palette: state.palette,
+      }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      $("#aiStatus").textContent = payload.error || "AI 生成失败，已保留本地生成。";
+      return;
+    }
+    await renderAiImageToFrames(payload.image);
+    $("#pipelineMetric").textContent = payload.model || "AI模型";
+    $("#aiStatus").textContent = "AI 生成完成，已进入导出流程。";
+  } catch (error) {
+    $("#aiStatus").textContent = `AI 生成不可用：${error.message}`;
+  } finally {
+    $("#generateAi").disabled = false;
+  }
 }
 
 async function syncBackendSemantic() {
@@ -1988,6 +2074,8 @@ $("#randomPalette").addEventListener("click", () => {
 $("#generate").addEventListener("click", () => {
   generateWithBackend(() => hashText(`${controls.prompt.value}${Date.now()}`) % 10000000);
 });
+
+$("#generateAi").addEventListener("click", generateWithImageModel);
 
 $("#generatePack").addEventListener("click", () => {
   generateWithBackend(() => hashText(`pack|${controls.prompt.value}|${Date.now()}`) % 10000000);

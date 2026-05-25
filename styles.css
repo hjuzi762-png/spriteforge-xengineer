@@ -255,6 +255,12 @@ input[type="range"] {
   font-weight: 900;
 }
 
+.ai-primary {
+  margin-top: 10px;
+  background: #7dd3fc;
+  color: #06131b;
+}
+
 .secondary {
   width: 100%;
   min-height: 44px;
@@ -263,6 +269,14 @@ input[type="range"] {
   background: #f8d96a;
   color: #15130a;
   font-weight: 900;
+}
+
+.mini-status {
+  min-height: 18px;
+  margin-top: 8px;
+  color: #aeb9b5;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .upload-lab {

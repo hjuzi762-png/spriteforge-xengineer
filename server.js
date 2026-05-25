@@ -75,6 +75,73 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function buildImagePrompt(payload) {
+  const parsed = semanticParse(payload.prompt, payload.assetType);
+  const subject = parsed.subject;
+  const styleName = payload.style === "pixel" ? "crisp pixel art" : payload.style === "neon" ? "neon sci-fi game art" : payload.style === "ink" ? "ink wash game concept art" : "polished 2D game asset";
+  const colorHints = Array.isArray(payload.palette) ? payload.palette.join(", ") : "";
+  return [
+    `Create a ${styleName} for a 2D game.`,
+    `Subject: ${payload.prompt}. Interpreted subject category: ${subject}.`,
+    "Make the object/person highly recognizable and centered.",
+    "Use a transparent or plain clean background. Do not include text, watermark, UI, frame, or mockup.",
+    "Single isolated game asset, full body/object visible, readable silhouette, strong details, production-quality shape language.",
+    "Suitable for Unity or Godot sprite workflows.",
+    colorHints ? `Preferred palette: ${colorHints}.` : "",
+  ].filter(Boolean).join(" ");
+}
+
+async function generateOpenAIImage(payload) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    const error = new Error("未配置 OPENAI_API_KEY，无法调用真实图像生成模型。");
+    error.status = 400;
+    throw error;
+  }
+
+  const model = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1";
+  const prompt = buildImagePrompt(payload);
+  const imageSize = Number(payload.size) >= 512 ? "1024x1024" : "1024x1024";
+  const requestBody = {
+    model,
+    prompt,
+    size: imageSize,
+    quality: process.env.OPENAI_IMAGE_QUALITY || "medium",
+    n: 1,
+    background: "transparent",
+    output_format: "png",
+  };
+
+  const response = await fetch("https://api.openai.com/v1/images/generations", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  const result = await response.json();
+  if (!response.ok) {
+    const error = new Error(result.error?.message || "OpenAI 图像生成失败。");
+    error.status = response.status;
+    throw error;
+  }
+
+  const imageBase64 = result.data?.[0]?.b64_json;
+  if (!imageBase64) {
+    const error = new Error("OpenAI 响应中没有图片数据。");
+    error.status = 502;
+    throw error;
+  }
+
+  return {
+    model,
+    prompt,
+    image: `data:image/png;base64,${imageBase64}`,
+  };
+}
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -122,6 +189,20 @@ const server = http.createServer(async (req, res) => {
       });
     } catch (error) {
       sendJson(res, 400, { error: error.message });
+    }
+    return;
+  }
+  if (req.method === "POST" && req.url === "/api/generate-image") {
+    try {
+      const body = await readBody(req);
+      const payload = JSON.parse(body || "{}");
+      const generated = await generateOpenAIImage(payload);
+      sendJson(res, 200, {
+        engine: "openai-images",
+        ...generated,
+      });
+    } catch (error) {
+      sendJson(res, error.status || 500, { error: error.message });
     }
     return;
   }
