@@ -39,6 +39,9 @@ const controls = {
   motionPrompt: $("#motionPrompt"),
 };
 
+let promptInputTimer = null;
+let isComposingText = false;
+
 const packItems = [
   { title: "主角", type: "character", note: "玩家角色，可作为 idle/run 动画基础" },
   { title: "敌人", type: "character", note: "同色系敌方单位，便于快速扩展关卡" },
@@ -1935,6 +1938,8 @@ async function renderAiImageToFrames(imageDataUrl) {
 }
 
 async function generateWithImageModel() {
+  controls.prompt.value = normalizePromptInput(controls.prompt.value);
+  controls.motionPrompt.value = normalizePromptInput(controls.motionPrompt.value);
   $("#aiStatus").textContent = "正在调用图像生成模型...";
   $("#generateAi").disabled = true;
   try {
@@ -1969,6 +1974,7 @@ async function generateWithImageModel() {
 async function syncBackendSemantic() {
   state.serverSemantic = null;
   try {
+    controls.prompt.value = normalizePromptInput(controls.prompt.value);
     const response = await fetch("/api/semantic-parse", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1994,6 +2000,43 @@ async function generateWithBackend(seedFactory) {
   state.seed = seedFactory();
   generate();
   renderAssetPack();
+}
+
+function normalizePromptInput(value) {
+  return value
+    .replace(/\u3000/g, " ")
+    .replace(/[，；、]/g, "，")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function scheduleTextPreview() {
+  if (isComposingText) return;
+  window.clearTimeout(promptInputTimer);
+  promptInputTimer = window.setTimeout(() => {
+    state.serverSemantic = null;
+    generate();
+  }, 420);
+}
+
+function commitTextInput() {
+  window.clearTimeout(promptInputTimer);
+  state.serverSemantic = null;
+  generate();
+  renderAssetPack();
+}
+
+function bindTextInput(control) {
+  control.addEventListener("compositionstart", () => {
+    isComposingText = true;
+    window.clearTimeout(promptInputTimer);
+  });
+  control.addEventListener("compositionend", () => {
+    isComposingText = false;
+    scheduleTextPreview();
+  });
+  control.addEventListener("input", scheduleTextPreview);
+  control.addEventListener("blur", commitTextInput);
 }
 
 $("#loginTab").addEventListener("click", () => setAuthMode("login"));
@@ -2051,11 +2094,14 @@ $("#clearImageMotion").addEventListener("click", () => {
 document.querySelectorAll("[data-example]").forEach((button) => {
   button.addEventListener("click", () => {
     controls.prompt.value = button.dataset.example;
-    generate();
+    commitTextInput();
   });
 });
 
-Object.values(controls).forEach((control) => {
+bindTextInput(controls.prompt);
+bindTextInput(controls.motionPrompt);
+
+[controls.assetType, controls.stylePreset, controls.size, controls.frames, controls.detail, controls.consistency].forEach((control) => {
   control.addEventListener("input", () => {
     state.serverSemantic = null;
     generate();
