@@ -42,7 +42,10 @@ node server.js
 ```bash
 set OPENAI_IMAGE_MODEL=gpt-image-1
 set OPENAI_IMAGE_QUALITY=medium
+set OPENAI_BASE_URL=https://api.openai.com/v1
 ```
+
+如果页面提示 `fetch failed`，通常是本机 Node 后端无法连接 OpenAI 服务。请检查网络、DNS 或代理；如果使用兼容 OpenAI Images API 的代理/中转服务，可以把 `OPENAI_BASE_URL` 设置为对应地址。
 
 也可以直接用浏览器打开 `index.html`，但此时会退回纯前端规则解析。
 

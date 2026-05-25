@@ -100,6 +100,7 @@ async function generateOpenAIImage(payload) {
   }
 
   const model = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1";
+  const baseUrl = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
   const prompt = buildImagePrompt(payload);
   const imageSize = Number(payload.size) >= 512 ? "1024x1024" : "1024x1024";
   const requestBody = {
@@ -112,14 +113,29 @@ async function generateOpenAIImage(payload) {
     output_format: "png",
   };
 
-  const response = await fetch("https://api.openai.com/v1/images/generations", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(requestBody),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 90_000);
+  let response;
+  try {
+    response = await fetch(`${baseUrl}/images/generations`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+      signal: controller.signal,
+    });
+  } catch (cause) {
+    const hint = cause.name === "AbortError"
+      ? "请求超时，请检查网络或稍后重试。"
+      : "无法连接图像生成服务，请检查网络、代理、DNS，或配置 OPENAI_BASE_URL。";
+    const error = new Error(`${hint} 当前地址：${baseUrl}。底层错误：${cause.message}`);
+    error.status = 502;
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   const result = await response.json();
   if (!response.ok) {

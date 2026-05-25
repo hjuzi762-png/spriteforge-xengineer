@@ -22,6 +22,7 @@ SpriteForge 是一个在浏览器本地运行的 2D 游戏素材生成工具。�
 - 像素模式从早期 32 格低模升级为 48 格精细模板，补充轮廓、五官、装备、高光、翅膀和粒子细节。
 - 新增无依赖 Node 后端，提供 `/api/semantic-parse` 语义解析接口，用于识别小狗、猫头鹰、特斯拉、车辆、飞船、建筑、药水、武器等描述；接口不可用时前端自动回退到本地规则。
 - 新增 `/api/generate-image` OpenAI Images API 后端代理，配置 `OPENAI_API_KEY` 后可调用真实图像生成模型，并把返回图片接入预览、Spritesheet、PNG 与 JSON 导出流程。
+- 支持 `OPENAI_BASE_URL` 配置，便于在网络受限环境下使用兼容 OpenAI Images API 的代理或中转服务。
 - 支持自定义调色板。
 - 支持 PNG、Spritesheet、JSON 导出。
 - 支持生成一组同风格资产，包括主角、敌人、掉落物、Tile 地块和技能图标。
