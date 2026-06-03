@@ -61,6 +61,26 @@ set OPENAI_BASE_URL=https://api.openai.com/v1
 
 如果页面提示 `fetch failed`，通常是本机 Node 后端无法连接 OpenAI 服务。请检查网络、DNS 或代理；如果使用兼容 OpenAI Images API 的代理/中转服务，可以把 `OPENAI_BASE_URL` 设置为对应地址。
 
+如果要启用 DeepSeek 语义解析，可以额外配置：
+
+PowerShell：
+
+```powershell
+$env:DEEPSEEK_API_KEY="你的_DeepSeek_Key"
+$env:DEEPSEEK_MODEL="deepseek-v4-flash"
+node server.js
+```
+
+cmd：
+
+```bat
+set DEEPSEEK_API_KEY=你的_DeepSeek_Key
+set DEEPSEEK_MODEL=deepseek-v4-flash
+node server.js
+```
+
+说明：DeepSeek 当前用于 `/api/semantic-parse`，帮助识别描述里的主体、颜色、风格和装备；真实图片生成仍使用兼容 OpenAI Images API 的图像模型接口。
+
 也可以直接用浏览器打开 `index.html`，但此时会退回纯前端规则解析。
 
 也可以使用任意静态服务器：

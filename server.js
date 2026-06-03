@@ -73,6 +73,105 @@ function semanticParse(prompt, assetType = "character") {
   return { semantic, subject };
 }
 
+function normalizeSemanticPlan(plan, fallback) {
+  if (!plan || typeof plan !== "object") return fallback;
+  const allowedSubjects = new Set([
+    "character", "cat", "dog", "owl", "bird", "vehicle", "tesla", "spaceship",
+    "building", "weapon", "potion", "chest", "mech", "slime", "plant", "tile", "icon", "prop",
+  ]);
+  const semantic = { ...fallback.semantic };
+  if (plan.semantic && typeof plan.semantic === "object") {
+    Object.entries(plan.semantic).forEach(([key, value]) => {
+      semantic[key] = Boolean(value);
+    });
+  }
+  const subject = allowedSubjects.has(plan.subject) ? plan.subject : fallback.subject;
+  return {
+    semantic,
+    subject,
+    modelNote: typeof plan.note === "string" ? plan.note.slice(0, 240) : "",
+  };
+}
+
+async function parseWithDeepSeek(payload) {
+  const fallback = semanticParse(payload.prompt, payload.assetType);
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) return { engine: "local-semantic", ...fallback };
+
+  const model = process.env.DEEPSEEK_MODEL || "deepseek-v4-flash";
+  const baseUrl = (process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").replace(/\/$/, "");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20_000);
+  let response;
+
+  const systemPrompt = [
+    "You parse Chinese or English 2D game asset prompts.",
+    "Return JSON only. No markdown.",
+    "Schema: {\"subject\":\"character|cat|dog|owl|bird|vehicle|tesla|spaceship|building|weapon|potion|chest|mech|slime|plant|tile|icon|prop\",\"semantic\":{\"character\":boolean,\"cat\":boolean,\"dog\":boolean,\"owl\":boolean,\"vehicle\":boolean,\"tesla\":boolean,\"weapon\":boolean,\"monochrome\":boolean,\"black\":boolean,\"white\":boolean,\"gray\":boolean,\"blue\":boolean,\"red\":boolean,\"green\":boolean,\"purple\":boolean,\"gold\":boolean,\"fire\":boolean,\"ice\":boolean,\"thunder\":boolean},\"note\":\"short Chinese note\"}.",
+    "If a prompt mentions a character and a weapon, choose subject=character and mark weapon=true.",
+    "For 黑白/black and white, mark monochrome=true, black=true, white=true.",
+  ].join(" ");
+
+  try {
+    response = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: JSON.stringify({
+            prompt: payload.prompt || "",
+            assetType: payload.assetType || "character",
+            style: payload.style || "",
+          }) },
+        ],
+        temperature: 0,
+        response_format: { type: "json_object" },
+      }),
+      signal: controller.signal,
+    });
+  } catch (cause) {
+    return {
+      engine: "local-semantic",
+      ...fallback,
+      note: `DeepSeek 不可用，已回退本地语义解析：${cause.message}`,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  let result = {};
+  try {
+    result = await response.json();
+  } catch {
+    return { engine: "local-semantic", ...fallback, note: "DeepSeek 响应不可解析，已回退本地语义解析。" };
+  }
+
+  if (!response.ok) {
+    return {
+      engine: "local-semantic",
+      ...fallback,
+      note: `DeepSeek 调用失败，已回退本地语义解析：${result.error?.message || response.status}`,
+    };
+  }
+
+  try {
+    const content = result.choices?.[0]?.message?.content || "{}";
+    const plan = JSON.parse(content);
+    return {
+      engine: "deepseek-semantic",
+      model,
+      ...normalizeSemanticPlan(plan, fallback),
+    };
+  } catch {
+    return { engine: "local-semantic", ...fallback, note: "DeepSeek JSON 格式异常，已回退本地语义解析。" };
+  }
+}
+
 function sendJson(res, status, payload) {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(payload));
@@ -203,11 +302,10 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = await readBody(req);
       const payload = JSON.parse(body || "{}");
-      const parsed = semanticParse(payload.prompt, payload.assetType);
+      const parsed = await parseWithDeepSeek(payload);
       sendJson(res, 200, {
-        engine: "local-semantic",
         ...parsed,
-        note: "No external model key is required. This backend expands prompt understanding and can be replaced by a real image model proxy.",
+        note: parsed.note || parsed.modelNote || "DeepSeek 未配置时会自动使用本地语义解析。",
       });
     } catch (error) {
       sendJson(res, 400, { error: error.message });
